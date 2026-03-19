@@ -30,22 +30,56 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+        run: npm run tauri build
+
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          BUNDLE=src-tauri/target/release/bundle
+
+          # Create release if it doesn't exist
+          gh release create "$GITHUB_REF_NAME" \
+            --title "PyArsenal v${VERSION}" \
+            --notes "See the changelog for details." \
+            --latest || true
+
+          # Upload Linux bundles
+          gh release upload "$GITHUB_REF_NAME" \
+            "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage" \
+            "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage.tar.gz" \
+            "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage.tar.gz.sig" \
+            "${BUNDLE}/deb/PyArsenal_${VERSION}_amd64.deb" \
+            "${BUNDLE}/rpm/PyArsenal-${VERSION}-1.x86_64.rpm" \
+            --clobber
+
+      - name: Generate linux updater JSON fragment
+        id: linux_updater
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          BUNDLE=src-tauri/target/release/bundle
+          SIG=$(cat "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage.tar.gz.sig")
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/PyArsenal_${VERSION}_amd64.AppImage.tar.gz"
+          echo "sig=${SIG}" >> $GITHUB_OUTPUT
+          echo "url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+
+      - name: Upload linux updater info
+        uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: 'PyArsenal v__VERSION__'
-          releaseBody: 'See the changelog for details.'
-          releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: true
+          name: linux-updater
+          path: |
+            src-tauri/target/release/bundle/appimage/*.tar.gz.sig
 
   build-windows:
     runs-on: windows-latest
-    needs: build-linux
     steps:
       - uses: actions/checkout@v4
 
@@ -61,15 +95,89 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+        run: npm run tauri build
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          BUNDLE=src-tauri/target/release/bundle
+
+          gh release upload "$GITHUB_REF_NAME" \
+            "${BUNDLE}/nsis/PyArsenal_${VERSION}_x64-setup.exe" \
+            "${BUNDLE}/nsis/PyArsenal_${VERSION}_x64-setup.nsis.zip" \
+            "${BUNDLE}/nsis/PyArsenal_${VERSION}_x64-setup.nsis.zip.sig" \
+            "${BUNDLE}/msi/PyArsenal_${VERSION}_x64_en-US.msi" \
+            --clobber
+
+      - name: Upload windows updater info
+        uses: actions/upload-artifact@v4
         with:
-          tagName: v__VERSION__
-          releaseName: 'PyArsenal v__VERSION__'
-          releaseBody: 'See the changelog for details.'
-          releaseDraft: false
-          prerelease: false
-          includeUpdaterJson: true
+          name: windows-updater
+          path: |
+            src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+
+  publish-updater:
+    needs: [build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Download linux updater info
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-updater
+          path: linux-sigs
+
+      - name: Download windows updater info
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-updater
+          path: windows-sigs
+
+      - name: Generate latest.json
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          LINUX_SIG=$(cat linux-sigs/*.tar.gz.sig)
+          WINDOWS_SIG=$(cat windows-sigs/*.nsis.zip.sig)
+
+          cat > latest.json << ENDJSON
+          {
+            "version": "v${VERSION}",
+            "notes": "PyArsenal v${VERSION}",
+            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "platforms": {
+              "linux-x86_64": {
+                "signature": "${LINUX_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_amd64.AppImage.tar.gz"
+              },
+              "windows-x86_64": {
+                "signature": "${WINDOWS_SIG}",
+                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_x64-setup.nsis.zip"
+              }
+            }
+          }
+          ENDJSON
+
+          echo "Generated latest.json:"
+          cat latest.json
+
+      - name: Upload latest.json to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" latest.json --clobber --repo "${{ github.repository }}"
