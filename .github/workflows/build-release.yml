@@ -39,20 +39,41 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Upload artifacts to release
+      - name: Prepare updater bundle
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          BUNDLE=src-tauri/target/release/bundle
+          APPIMAGE="${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage"
+          # Create .tar.gz for the updater
+          cd "${BUNDLE}/appimage"
+          tar czf "PyArsenal_${VERSION}_amd64.AppImage.tar.gz" "PyArsenal_${VERSION}_amd64.AppImage"
+
+      - name: Sign updater bundle
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          BUNDLE=src-tauri/target/release/bundle
+          # Install tauri-cli for signing
+          cargo install tauri-cli --version "^2" || true
+          cargo tauri signer sign \
+            "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage.tar.gz" \
+            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+            --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+
+      - name: Create release and upload
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${{ steps.version.outputs.version }}
           BUNDLE=src-tauri/target/release/bundle
 
-          # Create release if it doesn't exist
           gh release create "$GITHUB_REF_NAME" \
             --title "PyArsenal v${VERSION}" \
             --notes "See the changelog for details." \
             --latest || true
 
-          # Upload Linux bundles
           gh release upload "$GITHUB_REF_NAME" \
             "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage" \
             "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage.tar.gz" \
@@ -61,22 +82,11 @@ jobs:
             "${BUNDLE}/rpm/PyArsenal-${VERSION}-1.x86_64.rpm" \
             --clobber
 
-      - name: Generate linux updater JSON fragment
-        id: linux_updater
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          BUNDLE=src-tauri/target/release/bundle
-          SIG=$(cat "${BUNDLE}/appimage/PyArsenal_${VERSION}_amd64.AppImage.tar.gz.sig")
-          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/v${VERSION}/PyArsenal_${VERSION}_amd64.AppImage.tar.gz"
-          echo "sig=${SIG}" >> $GITHUB_OUTPUT
-          echo "url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
-
-      - name: Upload linux updater info
+      - name: Save signature
         uses: actions/upload-artifact@v4
         with:
-          name: linux-updater
-          path: |
-            src-tauri/target/release/bundle/appimage/*.tar.gz.sig
+          name: linux-sig
+          path: src-tauri/target/release/bundle/appimage/*.tar.gz.sig
 
   build-windows:
     runs-on: windows-latest
@@ -105,7 +115,22 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Upload artifacts to release
+      - name: Prepare and sign updater bundle
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          $NSIS = "src-tauri\target\release\bundle\nsis"
+          $EXE = "$NSIS\PyArsenal_${VERSION}_x64-setup.exe"
+          # Create .nsis.zip for the updater
+          Compress-Archive -Path $EXE -DestinationPath "$NSIS\PyArsenal_${VERSION}_x64-setup.nsis.zip"
+          # Install tauri-cli and sign
+          cargo install tauri-cli --version "^2"
+          cargo tauri signer sign "$NSIS\PyArsenal_${VERSION}_x64-setup.nsis.zip" --private-key $env:TAURI_SIGNING_PRIVATE_KEY --password "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+
+      - name: Upload to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
@@ -120,12 +145,11 @@ jobs:
             "${BUNDLE}/msi/PyArsenal_${VERSION}_x64_en-US.msi" \
             --clobber
 
-      - name: Upload windows updater info
+      - name: Save signature
         uses: actions/upload-artifact@v4
         with:
-          name: windows-updater
-          path: |
-            src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
+          name: windows-sig
+          path: src-tauri/target/release/bundle/nsis/*.nsis.zip.sig
 
   publish-updater:
     needs: [build-linux, build-windows]
@@ -135,27 +159,21 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Download linux updater info
+      - name: Download signatures
         uses: actions/download-artifact@v4
         with:
-          name: linux-updater
-          path: linux-sigs
+          path: sigs
 
-      - name: Download windows updater info
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-updater
-          path: windows-sigs
-
-      - name: Generate latest.json
+      - name: Generate and upload latest.json
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version.outputs.version }}
           REPO: ${{ github.repository }}
         run: |
-          LINUX_SIG=$(cat linux-sigs/*.tar.gz.sig)
-          WINDOWS_SIG=$(cat windows-sigs/*.nsis.zip.sig)
+          LINUX_SIG=$(cat sigs/linux-sig/*.sig)
+          WINDOWS_SIG=$(cat sigs/windows-sig/*.sig)
 
-          cat > latest.json << ENDJSON
+          cat > latest.json << EOF
           {
             "version": "v${VERSION}",
             "notes": "PyArsenal v${VERSION}",
@@ -171,13 +189,8 @@ jobs:
               }
             }
           }
-          ENDJSON
+          EOF
 
           echo "Generated latest.json:"
           cat latest.json
-
-      - name: Upload latest.json to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "$GITHUB_REF_NAME" latest.json --clobber --repo "${{ github.repository }}"
+          gh release upload "v${VERSION}" latest.json --clobber --repo "${REPO}"
