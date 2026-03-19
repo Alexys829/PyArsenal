@@ -19,6 +19,8 @@ pub struct CatalogEntry {
     pub category: String,
     pub icon: String,
     pub repo: String,
+    #[serde(default)]
+    pub author: String,
     pub platforms: Vec<String>,
     pub asset_patterns: HashMap<String, String>,
     pub binary_name: HashMap<String, String>,
@@ -42,6 +44,8 @@ pub struct InstalledTool {
     pub install_path: String,
     pub binary_path: String,
     pub repo: String,
+    #[serde(default)]
+    pub size_bytes: u64,
 }
 
 // ── GitHub API responses ──
@@ -77,6 +81,7 @@ pub struct DownloadProgress {
     pub tool_id: String,
     pub downloaded: u64,
     pub total: u64,
+    pub speed_bps: u64,
 }
 
 // ── Platform detection ──

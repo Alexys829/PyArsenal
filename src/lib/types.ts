@@ -5,6 +5,7 @@ export interface CatalogEntry {
   category: string;
   icon: string;
   repo: string;
+  author: string;
   platforms: string[];
   asset_patterns: Record<string, string>;
   binary_name: Record<string, string>;
@@ -19,6 +20,7 @@ export interface InstalledTool {
   install_path: string;
   binary_path: string;
   repo: string;
+  size_bytes: number;
 }
 
 export interface UpdateInfo {
@@ -31,4 +33,5 @@ export interface DownloadProgress {
   tool_id: string;
   downloaded: number;
   total: number;
+  speed_bps: number;
 }

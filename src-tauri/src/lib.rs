@@ -35,6 +35,9 @@ pub fn run() {
             commands::desktop::desktop_file_exists,
             commands::desktop::add_to_app_menu,
             commands::desktop::remove_from_app_menu,
+            commands::desktop::create_tool_shortcut,
+            commands::desktop::remove_tool_shortcut,
+            commands::desktop::tool_shortcut_exists,
         ])
         .setup(|app| {
             // Load PAT from keychain on startup

@@ -1,11 +1,14 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+import { listen } from "@tauri-apps/api/event";
 import { fetchCatalog, getInstalledTools, checkAllUpdates } from "./lib/api";
+import type { DownloadProgress } from "./lib/types";
 import {
   setCatalog,
   setInstalledTools,
   setUpdates,
+  setActiveDownloads,
   setLoading,
   showToast,
 } from "./lib/stores";
@@ -63,7 +66,16 @@ function App() {
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
+    // Listen for download progress events from Rust backend
+    const unlisten = await listen<DownloadProgress>("download-progress", (event) => {
+      setActiveDownloads((prev) => ({
+        ...prev,
+        [event.payload.tool_id]: event.payload,
+      }));
+    });
+    onCleanup(() => unlisten());
+
     loadData();
     checkSelfUpdate();
   });

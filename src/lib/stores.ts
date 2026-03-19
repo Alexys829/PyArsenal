@@ -1,11 +1,11 @@
 import { createSignal } from "solid-js";
-import type { CatalogEntry, InstalledTool, UpdateInfo } from "./types";
+import type { CatalogEntry, InstalledTool, UpdateInfo, DownloadProgress } from "./types";
 
 export const [catalog, setCatalog] = createSignal<CatalogEntry[]>([]);
 export const [installedTools, setInstalledTools] = createSignal<Record<string, InstalledTool>>({});
 export const [updates, setUpdates] = createSignal<UpdateInfo[]>([]);
 export const [loading, setLoading] = createSignal(false);
-export const [activeDownloads, setActiveDownloads] = createSignal<Record<string, number>>({});
+export const [activeDownloads, setActiveDownloads] = createSignal<Record<string, DownloadProgress>>({});
 
 // Toast notifications
 export interface Toast {
@@ -24,4 +24,12 @@ export function showToast(type: Toast["type"], message: string) {
   setTimeout(() => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, 5000);
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
 }

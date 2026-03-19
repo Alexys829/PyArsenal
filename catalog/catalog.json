@@ -9,6 +9,7 @@
       "category": "Utilities",
       "icon": "py-converter.png",
       "repo": "Alexys829/py-converter",
+      "author": "Alexys829",
       "platforms": ["linux", "windows"],
       "asset_patterns": {
         "linux": "PyConverter-{version}-linux-x86_64.AppImage",

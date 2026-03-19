@@ -11,7 +11,7 @@ use crate::models::{
 };
 use crate::paths::tools_dir;
 
-fn find_asset_url(entry: &CatalogEntry, release: &crate::models::GitHubRelease) -> AppResult<(String, String)> {
+fn find_asset_url(entry: &CatalogEntry, release: &crate::models::GitHubRelease) -> AppResult<(String, String, u64)> {
     let platform = current_platform();
     let version = release.tag_name.trim_start_matches('v');
 
@@ -27,14 +27,14 @@ fn find_asset_url(entry: &CatalogEntry, release: &crate::models::GitHubRelease) 
 
     for asset in &release.assets {
         if asset.name == expected_name {
-            return Ok((asset.browser_download_url.clone(), version.to_string()));
+            return Ok((asset.browser_download_url.clone(), version.to_string(), asset.size));
         }
     }
 
     // Fallback: try matching without exact version (pattern-based)
     for asset in &release.assets {
         if asset.name.contains(platform) {
-            return Ok((asset.browser_download_url.clone(), version.to_string()));
+            return Ok((asset.browser_download_url.clone(), version.to_string(), asset.size));
         }
     }
 
@@ -81,6 +81,23 @@ fn set_executable(_path: &Path) -> AppResult<()> {
     Ok(())
 }
 
+fn dir_size(path: &Path) -> u64 {
+    let mut total = 0u64;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let meta = entry.metadata();
+            if let Ok(m) = meta {
+                if m.is_file() {
+                    total += m.len();
+                } else if m.is_dir() {
+                    total += dir_size(&entry.path());
+                }
+            }
+        }
+    }
+    total
+}
+
 #[tauri::command]
 pub async fn install_tool(
     tool_id: String,
@@ -89,29 +106,46 @@ pub async fn install_tool(
     github: State<'_, GitHubClient>,
 ) -> AppResult<InstalledTool> {
     let release = github.get_latest_release(&catalog_entry.repo).await?;
-    let (download_url, version) = find_asset_url(&catalog_entry, &release)?;
+    let (download_url, version, _asset_size) = find_asset_url(&catalog_entry, &release)?;
 
-    // Emit start progress
+    // Download with streaming progress
+    let app_clone = app.clone();
+    let tid = tool_id.clone();
+    let start_time = std::time::Instant::now();
+
+    let data = github
+        .download_streaming(&download_url, move |downloaded, total| {
+            let elapsed = start_time.elapsed().as_secs_f64();
+            let speed_bps = if elapsed > 0.0 {
+                (downloaded as f64 / elapsed) as u64
+            } else {
+                0
+            };
+            // Throttle events to ~10/sec
+            if downloaded == total || downloaded % (256 * 1024) < 65536 {
+                app_clone
+                    .emit(
+                        "download-progress",
+                        DownloadProgress {
+                            tool_id: tid.clone(),
+                            downloaded,
+                            total,
+                            speed_bps,
+                        },
+                    )
+                    .ok();
+            }
+        })
+        .await?;
+
+    // Emit 100% completion
     app.emit(
         "download-progress",
         DownloadProgress {
             tool_id: tool_id.clone(),
-            downloaded: 0,
-            total: 0,
-        },
-    )
-    .ok();
-
-    // Download
-    let data: bytes::Bytes = github.download_bytes(&download_url).await?;
-    let total = data.len() as u64;
-
-    app.emit(
-        "download-progress",
-        DownloadProgress {
-            tool_id: tool_id.clone(),
-            downloaded: total,
-            total,
+            downloaded: data.len() as u64,
+            total: data.len() as u64,
+            speed_bps: 0,
         },
     )
     .ok();
@@ -159,6 +193,7 @@ pub async fn install_tool(
     }
 
     let binary_path = tool_dir.join(&binary_name);
+    let size_bytes = dir_size(&tool_dir);
 
     // Register in installed DB
     let now = chrono::Utc::now().to_rfc3339();
@@ -171,6 +206,7 @@ pub async fn install_tool(
         install_path: tool_dir.to_string_lossy().to_string(),
         binary_path: binary_path.to_string_lossy().to_string(),
         repo: catalog_entry.repo.clone(),
+        size_bytes,
     };
 
     let mut db = read_installed_db()?;

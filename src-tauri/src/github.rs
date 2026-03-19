@@ -25,10 +25,6 @@ impl GitHubClient {
         *self.pat.write().await = pat;
     }
 
-    pub async fn get_pat(&self) -> Option<String> {
-        self.pat.read().await.clone()
-    }
-
     async fn headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         headers.insert(USER_AGENT, HeaderValue::from_static("PyArsenal"));
@@ -56,7 +52,6 @@ impl GitHubClient {
                 repo: repo.to_string(),
             })?;
 
-        // Check rate limit
         if resp.status() == reqwest::StatusCode::FORBIDDEN
             || resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
         {
@@ -95,6 +90,36 @@ impl GitHubClient {
             .send()
             .await?;
         Ok(resp.bytes().await?)
+    }
+
+    /// Download with streaming progress callback
+    pub async fn download_streaming(
+        &self,
+        url: &str,
+        mut on_progress: impl FnMut(u64, u64),
+    ) -> AppResult<Vec<u8>> {
+        use futures_util::StreamExt;
+
+        let resp = self
+            .client
+            .get(url)
+            .headers(self.headers().await)
+            .send()
+            .await?;
+
+        let total = resp.content_length().unwrap_or(0);
+        let mut downloaded: u64 = 0;
+        let mut data = Vec::with_capacity(total as usize);
+        let mut stream = resp.bytes_stream();
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            downloaded += chunk.len() as u64;
+            data.extend_from_slice(&chunk);
+            on_progress(downloaded, total);
+        }
+
+        Ok(data)
     }
 
     pub async fn get_rate_limit(&self) -> AppResult<(u32, u32)> {
