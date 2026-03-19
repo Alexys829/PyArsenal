@@ -51,3 +51,4 @@ jobs:
           releaseBody: 'See the changelog for details.'
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true

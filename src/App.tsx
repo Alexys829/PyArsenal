@@ -1,4 +1,6 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { fetchCatalog, getInstalledTools, checkAllUpdates } from "./lib/api";
 import {
   setCatalog,
@@ -44,8 +46,26 @@ function App() {
     }
   }
 
+  async function checkSelfUpdate() {
+    try {
+      const update = await check();
+      if (update) {
+        showToast(
+          "info",
+          `PyArsenal ${update.version} available! Downloading...`
+        );
+        await update.downloadAndInstall();
+        showToast("success", "Update installed! Restarting...");
+        await relaunch();
+      }
+    } catch {
+      // Silent fail — self-update is best-effort
+    }
+  }
+
   onMount(() => {
     loadData();
+    checkSelfUpdate();
   });
 
   return (
