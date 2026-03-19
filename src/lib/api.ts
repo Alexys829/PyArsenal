@@ -81,12 +81,13 @@ export const addToAppMenu = (appimagePath: string) =>
 export const removeFromAppMenu = () =>
   invoke<boolean>("remove_from_app_menu");
 
-// Tool desktop shortcuts
-export const createToolShortcut = (toolId: string, toolName: string, binaryPath: string) =>
-  invoke<void>("create_tool_shortcut", { toolId, toolName, binaryPath });
+// Tool shortcuts (cross-platform)
+// shortcutType: "desktop" | "startmenu" | "both" (Windows), ignored on Linux
+export const createToolShortcut = (toolId: string, toolName: string, binaryPath: string, shortcutType: string = "both") =>
+  invoke<void>("create_tool_shortcut", { toolId, toolName, binaryPath, shortcutType });
 
-export const removeToolShortcut = (toolId: string) =>
-  invoke<void>("remove_tool_shortcut", { toolId });
+export const removeToolShortcut = (toolId: string, toolName: string) =>
+  invoke<void>("remove_tool_shortcut", { toolId, toolName });
 
-export const toolShortcutExists = (toolId: string) =>
-  invoke<boolean>("tool_shortcut_exists", { toolId });
+export const toolShortcutExists = (toolId: string, toolName: string) =>
+  invoke<boolean>("tool_shortcut_exists", { toolId, toolName });

@@ -394,7 +394,8 @@ pub async fn uninstall_tool(tool_id: String) -> AppResult<()> {
     }
 
     // Also remove desktop shortcut if it exists
-    let _ = super::desktop::remove_tool_shortcut(tool_id).await;
+    let tool_name = tool.name.clone();
+    let _ = super::desktop::remove_tool_shortcut(tool_id, tool_name).await;
 
     Ok(())
 }

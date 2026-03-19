@@ -46,18 +46,21 @@ interface ToolCardProps {
 export default function ToolCard(props: ToolCardProps) {
   const [busy, setBusy] = createSignal(false);
   const [hasShortcut, setHasShortcut] = createSignal(false);
-  const [isLinux, setIsLinux] = createSignal(false);
+  const [currentPlatform, setCurrentPlatform] = createSignal("");
   const [iconSrc, setIconSrc] = createSignal("");
   const [confirmUninstall, setConfirmUninstall] = createSignal(false);
+
+  const isLinux = () => currentPlatform() === "linux";
+  const isWindows = () => currentPlatform() === "windows";
 
   onMount(async () => {
     try {
       const platform = await getPlatform();
-      setIsLinux(platform === "linux");
+      setCurrentPlatform(platform);
     } catch { /* ignore */ }
     if (props.mode === "library" && props.installedTool) {
       try {
-        const exists = await toolShortcutExists(props.entry.id);
+        const exists = await toolShortcutExists(props.entry.id, props.entry.name);
         setHasShortcut(exists);
       } catch { /* ignore */ }
     }
@@ -154,11 +157,13 @@ export default function ToolCard(props: ToolCardProps) {
     if (!props.installedTool) return;
     try {
       if (hasShortcut()) {
-        await removeToolShortcut(props.entry.id);
+        await removeToolShortcut(props.entry.id, props.entry.name);
         setHasShortcut(false);
         showToast("info", `Shortcut removed.`);
       } else {
-        await createToolShortcut(props.entry.id, props.entry.name, props.installedTool.binary_path);
+        // Linux: app menu; Windows: desktop + start menu
+        const type = isWindows() ? "both" : "desktop";
+        await createToolShortcut(props.entry.id, props.entry.name, props.installedTool.binary_path, type);
         setHasShortcut(true);
         showToast("success", `Shortcut created.`);
       }
@@ -262,15 +267,18 @@ export default function ToolCard(props: ToolCardProps) {
                 <CancelIcon />
               </button>
             )}
-            <Show when={isLinux()}>
-              <button
-                class={`btn ${hasShortcut() ? "btn-icon-active" : "btn-icon"}`}
-                onClick={handleToggleShortcut}
-                title={hasShortcut() ? "Remove shortcut" : "Add shortcut"}
-              >
-                {hasShortcut() ? <CheckIcon /> : <ShortcutIcon />}
-              </button>
-            </Show>
+            <button
+              class={`btn ${hasShortcut() ? "btn-icon-active" : "btn-icon"}`}
+              onClick={handleToggleShortcut}
+              title={hasShortcut()
+                ? "Remove shortcut"
+                : isWindows()
+                  ? "Add to Desktop & Start Menu"
+                  : "Add to application menu"
+              }
+            >
+              {hasShortcut() ? <CheckIcon /> : <ShortcutIcon />}
+            </button>
             <button class="btn btn-icon" onClick={() => openInstallFolder(props.entry.id)} title="Open install folder">
               <FolderIcon />
             </button>
