@@ -204,6 +204,22 @@ body {
   color: #000;
 }
 
+.tab-incompatible {
+  border-color: rgba(196, 64, 64, 0.3);
+  color: var(--text-muted);
+}
+
+.incompatible-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-bottom: 16px;
+  font-style: italic;
+}
+
+.tool-grid-dimmed {
+  opacity: 0.6;
+}
+
 /* ── Tool Grid ── */
 .tool-grid {
   display: grid;
@@ -379,6 +395,9 @@ body {
 .btn-install {
   background: var(--accent);
   color: #000;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .btn-install:hover:not(:disabled) {
@@ -393,6 +412,9 @@ body {
 .btn-launch {
   background: var(--success);
   color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .btn-launch:hover {
@@ -402,64 +424,83 @@ body {
 .btn-update {
   background: var(--warning);
   color: #000;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .btn-update:hover:not(:disabled) {
   background: #d09520;
 }
 
-.btn-github {
+.btn-icon {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 8px;
+  min-width: 34px;
 }
 
-.btn-github:hover {
+.btn-icon:hover {
   background: rgba(255, 255, 255, 0.15);
   color: var(--text);
 }
 
-.btn-bug {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-muted);
+.btn-icon-active {
+  background: rgba(102, 192, 244, 0.15);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  min-width: 34px;
 }
 
-.btn-bug:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--text);
+.btn-icon-active:hover {
+  background: rgba(102, 192, 244, 0.25);
 }
 
-.btn-uninstall {
+.btn-icon-danger {
+  background: rgba(196, 64, 64, 0.15);
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  min-width: 34px;
+}
+
+.btn-icon-danger:hover:not(:disabled) {
+  background: rgba(196, 64, 64, 0.3);
+}
+
+.btn-confirm-delete {
+  background: var(--danger);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+}
+
+.btn-cancel {
   background: rgba(196, 64, 64, 0.2);
   color: var(--danger);
-  font-size: 16px;
-  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.btn-uninstall:hover:not(:disabled) {
+.btn-cancel:hover {
   background: rgba(196, 64, 64, 0.4);
 }
 
-.btn-shortcut {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-muted);
-}
-
-.btn-shortcut:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--text);
-}
-
-.btn-shortcut-active {
-  background: rgba(102, 192, 244, 0.15);
-  color: var(--accent);
-}
-
-.btn-shortcut-active:hover {
-  background: rgba(102, 192, 244, 0.25);
+.installed-label {
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 600;
 }
 
 .btn-small {

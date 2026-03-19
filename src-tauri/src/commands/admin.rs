@@ -262,6 +262,34 @@ pub async fn get_catalog_entries(github: State<'_, GitHubClient>) -> AppResult<V
     Ok(cf.catalog.tools)
 }
 
+/// Check if the current user has write access to the catalog repo
+#[tauri::command]
+pub async fn check_catalog_permission(github: State<'_, GitHubClient>) -> AppResult<bool> {
+    let pat = match get_pat_or_error(&github).await {
+        Ok(p) => p,
+        Err(_) => return Ok(false),
+    };
+
+    let url = format!("https://api.github.com/repos/{}", CATALOG_REPO);
+    let client = reqwest::Client::new();
+    let resp = client.get(&url)
+        .header("User-Agent", "PyArsenal")
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("Authorization", format!("Bearer {}", pat))
+        .send()
+        .await;
+
+    match resp {
+        Ok(r) if r.status().is_success() => {
+            let body: serde_json::Value = r.json().await.unwrap_or_default();
+            // Check if user has push permission
+            let can_push = body["permissions"]["push"].as_bool().unwrap_or(false);
+            Ok(can_push)
+        }
+        _ => Ok(false),
+    }
+}
+
 // ── Helpers ──
 
 fn parse_repo(input: &str) -> AppResult<String> {

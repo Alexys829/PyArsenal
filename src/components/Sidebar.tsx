@@ -1,8 +1,10 @@
+import { Show } from "solid-js";
 import { updates } from "../lib/stores";
 
 interface SidebarProps {
   activePage: string;
   onNavigate: (page: string) => void;
+  showManage: boolean;
 }
 
 export default function Sidebar(props: SidebarProps) {
@@ -35,15 +37,17 @@ export default function Sidebar(props: SidebarProps) {
             <span class="badge">{updateCount()}</span>
           )}
         </li>
-        <li
-          class={props.activePage === "addtool" ? "active" : ""}
-          onClick={() => props.onNavigate("addtool")}
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-          </svg>
-          <span>Manage Catalog</span>
-        </li>
+        <Show when={props.showManage}>
+          <li
+            class={props.activePage === "addtool" ? "active" : ""}
+            onClick={() => props.onNavigate("addtool")}
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+            <span>Manage Catalog</span>
+          </li>
+        </Show>
         <li
           class={props.activePage === "settings" ? "active" : ""}
           onClick={() => props.onNavigate("settings")}
@@ -55,7 +59,7 @@ export default function Sidebar(props: SidebarProps) {
         </li>
       </ul>
       <div class="sidebar-footer">
-        <span class="version">v0.3.0</span>
+        <span class="version">v0.3.1</span>
       </div>
     </nav>
   );

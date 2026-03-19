@@ -4,6 +4,9 @@ import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult } from "./
 export const fetchCatalog = () =>
   invoke<CatalogEntry[]>("fetch_catalog");
 
+export const forceRefreshCatalog = () =>
+  invoke<void>("force_refresh_catalog");
+
 export const getToolIcon = (repo: string, toolId: string) =>
   invoke<string>("get_tool_icon", { repo, toolId });
 
@@ -22,6 +25,9 @@ export const updateInCatalog = (entry: CatalogEntry) =>
 
 export const getCatalogEntries = () =>
   invoke<CatalogEntry[]>("get_catalog_entries");
+
+export const checkCatalogPermission = () =>
+  invoke<boolean>("check_catalog_permission");
 
 export const getInstalledTools = () =>
   invoke<Record<string, InstalledTool>>("get_installed_tools");

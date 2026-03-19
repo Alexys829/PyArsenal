@@ -16,14 +16,23 @@ pub async fn launch_tool(tool_id: String) -> AppResult<()> {
     #[cfg(unix)]
     {
         Command::new(binary)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|e| AppError::Generic(format!("Failed to launch {}: {}", tool_id, e)))?;
     }
 
     #[cfg(windows)]
     {
-        Command::new("cmd")
-            .args(["/C", "start", "", binary])
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        Command::new(binary)
+            .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|e| AppError::Generic(format!("Failed to launch {}: {}", tool_id, e)))?;
     }

@@ -3,9 +3,9 @@ import { open } from "@tauri-apps/plugin-shell";
 import type { CatalogEntry, InstalledTool, UpdateInfo } from "../lib/types";
 import {
   installTool,
+  cancelInstall,
   uninstallTool,
   launchTool,
-  cancelInstall,
   openInstallFolder,
   createToolShortcut,
   removeToolShortcut,
@@ -23,6 +23,18 @@ import {
   formatBytes,
 } from "../lib/stores";
 
+// SVG Icons
+const PlayIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>;
+const DownloadIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>;
+const UpdateIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M21 10.12h-6.78l2.74-2.82c-2.73-2.7-7.15-2.8-9.88-.1-2.73 2.71-2.73 7.08 0 9.79s7.15 2.71 9.88 0C18.32 15.65 19 14.08 19 12.1h2c0 2.48-.94 4.96-2.82 6.86-3.72 3.72-9.76 3.72-13.48 0s-3.72-9.76 0-13.48 9.76-3.72 13.48 0L21 2v8.12z"/></svg>;
+const CancelIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>;
+const DeleteIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>;
+const FolderIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>;
+const BugIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M20 8h-2.81a5.985 5.985 0 00-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5s-.96.06-1.41.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z"/></svg>;
+const GitHubIcon = () => <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>;
+const ShortcutIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>;
+const CheckIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>;
+
 interface ToolCardProps {
   entry: CatalogEntry;
   mode: "store" | "library";
@@ -36,6 +48,7 @@ export default function ToolCard(props: ToolCardProps) {
   const [hasShortcut, setHasShortcut] = createSignal(false);
   const [isLinux, setIsLinux] = createSignal(false);
   const [iconSrc, setIconSrc] = createSignal("");
+  const [confirmUninstall, setConfirmUninstall] = createSignal(false);
 
   onMount(async () => {
     try {
@@ -48,7 +61,7 @@ export default function ToolCard(props: ToolCardProps) {
         setHasShortcut(exists);
       } catch { /* ignore */ }
     }
-    // Load icon from tool's repo (assets/icon.png)
+    // Load icon
     try {
       const dataUrl = await getToolIcon(props.entry.repo, props.entry.id);
       if (dataUrl) {
@@ -60,11 +73,7 @@ export default function ToolCard(props: ToolCardProps) {
   const isInstalled = () => !!installedTools()[props.entry.id];
   const dlProgress = () => activeDownloads()[props.entry.id];
   const update = () => updates().find((u) => u.tool_id === props.entry.id);
-
-  const author = () => {
-    if (props.entry.author) return props.entry.author;
-    return props.entry.repo.split("/")[0] || "";
-  };
+  const author = () => props.entry.author || props.entry.repo.split("/")[0] || "";
 
   async function handleInstall() {
     setBusy(true);
@@ -75,16 +84,14 @@ export default function ToolCard(props: ToolCardProps) {
     try {
       const tool = await installTool(props.entry.id, props.entry);
       setInstalledTools((prev) => ({ ...prev, [props.entry.id]: tool }));
-      showToast("success", `${props.entry.name} installed successfully!`);
+      showToast("success", `${props.entry.name} installed!`);
     } catch (e) {
-      showToast("error", `Failed to install ${props.entry.name}: ${e}`);
+      if (!String(e).includes("cancelled")) {
+        showToast("error", `Failed to install ${props.entry.name}: ${e}`);
+      }
     } finally {
       setBusy(false);
-      setActiveDownloads((prev) => {
-        const next = { ...prev };
-        delete next[props.entry.id];
-        return next;
-      });
+      setActiveDownloads((prev) => { const n = { ...prev }; delete n[props.entry.id]; return n; });
       props.onRefresh();
     }
   }
@@ -100,31 +107,38 @@ export default function ToolCard(props: ToolCardProps) {
       setInstalledTools((prev) => ({ ...prev, [props.entry.id]: tool }));
       showToast("success", `${props.entry.name} updated to v${tool.installed_version}!`);
     } catch (e) {
-      showToast("error", `Failed to update ${props.entry.name}: ${e}`);
+      if (!String(e).includes("cancelled")) {
+        showToast("error", `Failed to update ${props.entry.name}: ${e}`);
+      }
     } finally {
       setBusy(false);
-      setActiveDownloads((prev) => {
-        const next = { ...prev };
-        delete next[props.entry.id];
-        return next;
-      });
+      setActiveDownloads((prev) => { const n = { ...prev }; delete n[props.entry.id]; return n; });
       props.onRefresh();
     }
   }
 
+  async function handleCancel() {
+    await cancelInstall(props.entry.id);
+    setBusy(false);
+    setActiveDownloads((prev) => { const n = { ...prev }; delete n[props.entry.id]; return n; });
+    showToast("info", "Download cancelled.");
+  }
+
   async function handleUninstall() {
+    if (!confirmUninstall()) {
+      setConfirmUninstall(true);
+      setTimeout(() => setConfirmUninstall(false), 3000);
+      return;
+    }
+    setConfirmUninstall(false);
     setBusy(true);
     try {
       await uninstallTool(props.entry.id);
-      setInstalledTools((prev) => {
-        const next = { ...prev };
-        delete next[props.entry.id];
-        return next;
-      });
+      setInstalledTools((prev) => { const n = { ...prev }; delete n[props.entry.id]; return n; });
       setHasShortcut(false);
       showToast("success", `${props.entry.name} uninstalled.`);
     } catch (e) {
-      showToast("error", `Failed to uninstall ${props.entry.name}: ${e}`);
+      showToast("error", `Failed to uninstall: ${e}`);
     } finally {
       setBusy(false);
       props.onRefresh();
@@ -132,21 +146,8 @@ export default function ToolCard(props: ToolCardProps) {
   }
 
   async function handleLaunch() {
-    try {
-      await launchTool(props.entry.id);
-    } catch (e) {
-      showToast("error", `Failed to launch ${props.entry.name}: ${e}`);
-    }
-  }
-
-  async function handleBugReport() {
-    const url = `https://github.com/${props.entry.repo}/issues/new`;
-    await open(url);
-  }
-
-  async function handleOpenRepo() {
-    const url = `https://github.com/${props.entry.repo}`;
-    await open(url);
+    try { await launchTool(props.entry.id); }
+    catch (e) { showToast("error", `Failed to launch: ${e}`); }
   }
 
   async function handleToggleShortcut() {
@@ -155,19 +156,13 @@ export default function ToolCard(props: ToolCardProps) {
       if (hasShortcut()) {
         await removeToolShortcut(props.entry.id);
         setHasShortcut(false);
-        showToast("info", `Desktop shortcut removed for ${props.entry.name}.`);
+        showToast("info", `Shortcut removed.`);
       } else {
-        await createToolShortcut(
-          props.entry.id,
-          props.entry.name,
-          props.installedTool.binary_path
-        );
+        await createToolShortcut(props.entry.id, props.entry.name, props.installedTool.binary_path);
         setHasShortcut(true);
-        showToast("success", `Desktop shortcut created for ${props.entry.name}.`);
+        showToast("success", `Shortcut created.`);
       }
-    } catch (e) {
-      showToast("error", `Shortcut error: ${e}`);
-    }
+    } catch (e) { showToast("error", `${e}`); }
   }
 
   const categoryClass = () => {
@@ -197,9 +192,7 @@ export default function ToolCard(props: ToolCardProps) {
         <div class="tool-info">
           <h3>{props.entry.name}</h3>
           <div class="tool-meta">
-            <span class={`category-badge ${categoryClass()}`}>
-              {props.entry.category}
-            </span>
+            <span class={`category-badge ${categoryClass()}`}>{props.entry.category}</span>
             <span class="tool-author">by {author()}</span>
           </div>
         </div>
@@ -212,11 +205,7 @@ export default function ToolCard(props: ToolCardProps) {
           {props.installedTool.size_bytes > 0 && (
             <span class="tool-size">{formatBytes(props.installedTool.size_bytes)}</span>
           )}
-          {update() && (
-            <span class="update-badge">
-              v{update()!.latest_version} available
-            </span>
-          )}
+          {update() && <span class="update-badge">v{update()!.latest_version} available</span>}
         </div>
       )}
 
@@ -227,12 +216,8 @@ export default function ToolCard(props: ToolCardProps) {
           </div>
           <div class="download-stats">
             <span>{progressPercent()}%</span>
-            <span>
-              {formatBytes(dlProgress()!.downloaded)} / {formatBytes(dlProgress()!.total)}
-            </span>
-            {dlProgress()!.speed_bps > 0 && (
-              <span>{formatBytes(dlProgress()!.speed_bps)}/s</span>
-            )}
+            <span>{formatBytes(dlProgress()!.downloaded)} / {formatBytes(dlProgress()!.total)}</span>
+            {dlProgress()!.speed_bps > 0 && <span>{formatBytes(dlProgress()!.speed_bps)}/s</span>}
           </div>
         </div>
       </Show>
@@ -241,42 +226,23 @@ export default function ToolCard(props: ToolCardProps) {
         {props.mode === "store" && (
           <>
             {isInstalled() ? (
-              <button class="btn btn-installed" disabled title="Already installed">
-                Installed
-              </button>
+              <>
+                <button class="btn btn-launch" onClick={handleLaunch} title={`Launch ${props.entry.name}`}>
+                  <PlayIcon /> Launch
+                </button>
+                <span class="installed-label">Installed</span>
+              </>
             ) : busy() ? (
-              <button
-                class="btn btn-uninstall"
-                onClick={async () => {
-                  await cancelInstall(props.entry.id);
-                  setBusy(false);
-                  setActiveDownloads((prev) => {
-                    const next = { ...prev };
-                    delete next[props.entry.id];
-                    return next;
-                  });
-                  showToast("info", "Installation cancelled.");
-                }}
-                title="Cancel installation"
-                style={{ "font-size": "13px", padding: "8px 16px" }}
-              >
-                Cancel
+              <button class="btn btn-cancel" onClick={handleCancel} title="Cancel installation">
+                <CancelIcon /> Cancel
               </button>
             ) : (
-              <button
-                class="btn btn-install"
-                onClick={handleInstall}
-                title={`Download and install ${props.entry.name}`}
-              >
-                Install
+              <button class="btn btn-install" onClick={handleInstall} title={`Install ${props.entry.name}`}>
+                <DownloadIcon /> Install
               </button>
             )}
-            <button
-              class="btn btn-github"
-              onClick={handleOpenRepo}
-              title="View on GitHub"
-            >
-              <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+            <button class="btn btn-icon" onClick={() => open(`https://github.com/${props.entry.repo}`)} title="View on GitHub">
+              <GitHubIcon />
             </button>
           </>
         )}
@@ -284,76 +250,44 @@ export default function ToolCard(props: ToolCardProps) {
         {props.mode === "library" && (
           <>
             <button class="btn btn-launch" onClick={handleLaunch} title={`Launch ${props.entry.name}`}>
-              Launch
+              <PlayIcon />
             </button>
             {update() && !busy() && (
-              <button
-                class="btn btn-update"
-                onClick={handleUpdate}
-                title={`Update to v${update()!.latest_version}`}
-              >
-                Update
+              <button class="btn btn-update" onClick={handleUpdate} title={`Update to v${update()!.latest_version}`}>
+                <UpdateIcon />
               </button>
             )}
             {busy() && (
-              <button
-                class="btn btn-uninstall"
-                onClick={async () => {
-                  await cancelInstall(props.entry.id);
-                  setBusy(false);
-                  setActiveDownloads((prev) => {
-                    const next = { ...prev };
-                    delete next[props.entry.id];
-                    return next;
-                  });
-                  showToast("info", "Download cancelled.");
-                }}
-                title="Cancel download"
-                style={{ "font-size": "13px", padding: "8px 16px" }}
-              >
-                Cancel
+              <button class="btn btn-cancel" onClick={handleCancel} title="Cancel download">
+                <CancelIcon />
               </button>
             )}
             <Show when={isLinux()}>
               <button
-                class={`btn ${hasShortcut() ? "btn-shortcut-active" : "btn-shortcut"}`}
+                class={`btn ${hasShortcut() ? "btn-icon-active" : "btn-icon"}`}
                 onClick={handleToggleShortcut}
-                title={hasShortcut() ? "Remove from application menu" : "Add to application menu"}
+                title={hasShortcut() ? "Remove shortcut" : "Add shortcut"}
               >
-                {hasShortcut() ? "Shortcut \u2713" : "Shortcut"}
+                {hasShortcut() ? <CheckIcon /> : <ShortcutIcon />}
               </button>
             </Show>
-            <button
-              class="btn btn-bug"
-              onClick={async () => {
-                try { await openInstallFolder(props.entry.id); }
-                catch (e) { showToast("error", `${e}`); }
-              }}
-              title="Open install folder"
-            >
-              Folder
+            <button class="btn btn-icon" onClick={() => openInstallFolder(props.entry.id)} title="Open install folder">
+              <FolderIcon />
+            </button>
+            <button class="btn btn-icon" onClick={() => open(`https://github.com/${props.entry.repo}`)} title="View on GitHub">
+              <GitHubIcon />
+            </button>
+            <button class="btn btn-icon" onClick={() => open(`https://github.com/${props.entry.repo}/issues/new`)} title="Report bug">
+              <BugIcon />
             </button>
             <button
-              class="btn btn-github"
-              onClick={handleOpenRepo}
-              title="View on GitHub"
-            >
-              <svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-            </button>
-            <button
-              class="btn btn-bug"
-              onClick={handleBugReport}
-              title="Report a bug on GitHub"
-            >
-              Bug
-            </button>
-            <button
-              class="btn btn-uninstall"
+              class={`btn ${confirmUninstall() ? "btn-confirm-delete" : "btn-icon-danger"}`}
               disabled={busy()}
               onClick={handleUninstall}
-              title={`Uninstall ${props.entry.name}`}
+              title={confirmUninstall() ? "Click again to confirm" : `Uninstall ${props.entry.name}`}
             >
-              &times;
+              <DeleteIcon />
+              {confirmUninstall() && <span style={{ "margin-left": "4px" }}>Confirm?</span>}
             </button>
           </>
         )}

@@ -2,7 +2,7 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
-import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries } from "./lib/api";
+import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission } from "./lib/api";
 import type { DownloadProgress } from "./lib/types";
 import {
   setCatalog,
@@ -27,6 +27,7 @@ function App() {
   const [selfUpdateProgress, setSelfUpdateProgress] = createSignal(0);
   const [selfUpdateTotal, setSelfUpdateTotal] = createSignal(0);
   const [selfUpdateVisible, setSelfUpdateVisible] = createSignal(false);
+  const [canManageCatalog, setCanManageCatalog] = createSignal(false);
 
   async function loadData(forceApi?: boolean) {
     setLoading(true);
@@ -106,6 +107,7 @@ function App() {
 
     loadData();
     checkSelfUpdate();
+    checkCatalogPermission().then(setCanManageCatalog).catch(() => {});
   });
 
   const updatePercent = () => {
@@ -115,7 +117,7 @@ function App() {
 
   return (
     <div class="app">
-      <Sidebar activePage={page()} onNavigate={setPage} />
+      <Sidebar activePage={page()} onNavigate={setPage} showManage={canManageCatalog()} />
       <main class="content">
         <Show when={page() === "store"}>
           <StorePage onRefresh={loadData} />

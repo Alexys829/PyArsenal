@@ -271,9 +271,31 @@ export default function SettingsPage() {
       </div>
 
       <div class="settings-section">
+        <h3>Catalog</h3>
+        <p class="settings-hint">
+          Force refresh the tool catalog if new tools don't appear.
+        </p>
+        <button
+          class="btn btn-small"
+          onClick={async () => {
+            try {
+              const { invoke } = await import("@tauri-apps/api/core");
+              await invoke("force_refresh_catalog");
+              showToast("success", "Catalog cache cleared. Reloading...");
+              window.location.reload();
+            } catch (e) {
+              showToast("error", `${e}`);
+            }
+          }}
+        >
+          Force Refresh Catalog
+        </button>
+      </div>
+
+      <div class="settings-section">
         <h3>About</h3>
         <p class="settings-hint">
-          PyArsenal v0.3.0 — Personal tool launcher
+          PyArsenal v0.3.1 — Personal tool launcher
         </p>
       </div>
     </div>

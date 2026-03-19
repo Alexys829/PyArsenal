@@ -30,7 +30,7 @@ pub async fn fetch_catalog(github: State<'_, GitHubClient>) -> AppResult<Vec<Cat
             if let Ok(text) = std::str::from_utf8(&bytes) {
                 std::fs::write(catalog_cache_path(), text).ok();
             }
-            return Ok(filter_by_platform(catalog));
+            return Ok(catalog.tools);
         }
     }
 
@@ -39,14 +39,24 @@ pub async fn fetch_catalog(github: State<'_, GitHubClient>) -> AppResult<Vec<Cat
     if cache.exists() {
         if let Ok(data) = std::fs::read_to_string(&cache) {
             if let Ok(catalog) = serde_json::from_str::<Catalog>(&data) {
-                return Ok(filter_by_platform(catalog));
+                return Ok(catalog.tools);
             }
         }
     }
 
     // Fallback to bundled catalog
     let catalog: Catalog = serde_json::from_str(BUNDLED_CATALOG)?;
-    Ok(filter_by_platform(catalog))
+    Ok(catalog.tools)
+}
+
+/// Force refresh: delete cache so next fetch_catalog gets fresh data
+#[tauri::command]
+pub async fn force_refresh_catalog() -> AppResult<()> {
+    let cache = catalog_cache_path();
+    if cache.exists() {
+        std::fs::remove_file(cache)?;
+    }
+    Ok(())
 }
 
 /// Returns the icon as a base64 data URL, downloading from the tool's repo if needed
