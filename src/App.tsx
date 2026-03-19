@@ -2,7 +2,7 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
-import { fetchCatalog, getInstalledTools, checkAllUpdates } from "./lib/api";
+import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries } from "./lib/api";
 import type { DownloadProgress } from "./lib/types";
 import {
   setCatalog,
@@ -11,22 +11,32 @@ import {
   setActiveDownloads,
   setLoading,
   showToast,
+  formatBytes,
 } from "./lib/stores";
 import Sidebar from "./components/Sidebar";
 import ToastContainer from "./components/Toast";
 import StorePage from "./pages/StorePage";
 import LibraryPage from "./pages/LibraryPage";
 import SettingsPage from "./pages/SettingsPage";
+import AddToolPage from "./pages/AddToolPage";
 import "./App.css";
 
 function App() {
   const [page, setPage] = createSignal("store");
+  const [selfUpdateStatus, setSelfUpdateStatus] = createSignal("");
+  const [selfUpdateProgress, setSelfUpdateProgress] = createSignal(0);
+  const [selfUpdateTotal, setSelfUpdateTotal] = createSignal(0);
+  const [selfUpdateVisible, setSelfUpdateVisible] = createSignal(false);
 
-  async function loadData() {
+  async function loadData(forceApi?: boolean) {
     setLoading(true);
     try {
+      // After catalog changes, use API (no CDN cache) to get fresh data
+      const catalogPromise = forceApi
+        ? getCatalogEntries().catch(() => fetchCatalog())
+        : fetchCatalog();
       const [catalogData, installed] = await Promise.all([
-        fetchCatalog(),
+        catalogPromise,
         getInstalledTools(),
       ]);
       setCatalog(catalogData);
@@ -52,22 +62,40 @@ function App() {
   async function checkSelfUpdate() {
     try {
       const update = await check();
-      if (update) {
-        showToast(
-          "info",
-          `PyArsenal ${update.version} available! Downloading...`
-        );
-        await update.downloadAndInstall();
-        showToast("success", "Update installed! Restarting...");
-        await relaunch();
-      }
+      if (!update) return;
+
+      setSelfUpdateVisible(true);
+      setSelfUpdateStatus(`PyArsenal ${update.version} found. Downloading...`);
+
+      let downloaded = 0;
+      let contentLength = 0;
+
+      await update.downloadAndInstall((event) => {
+        switch (event.event) {
+          case "Started":
+            contentLength = event.data.contentLength ?? 0;
+            setSelfUpdateTotal(contentLength);
+            setSelfUpdateStatus(`Downloading PyArsenal ${update.version}...`);
+            break;
+          case "Progress":
+            downloaded += event.data.chunkLength;
+            setSelfUpdateProgress(downloaded);
+            break;
+          case "Finished":
+            setSelfUpdateStatus("Installing update...");
+            break;
+        }
+      });
+
+      setSelfUpdateStatus("Update installed! Restarting...");
+      await new Promise((r) => setTimeout(r, 1000));
+      await relaunch();
     } catch {
-      // Silent fail — self-update is best-effort
+      setSelfUpdateVisible(false);
     }
   }
 
   onMount(async () => {
-    // Listen for download progress events from Rust backend
     const unlisten = await listen<DownloadProgress>("download-progress", (event) => {
       setActiveDownloads((prev) => ({
         ...prev,
@@ -80,6 +108,11 @@ function App() {
     checkSelfUpdate();
   });
 
+  const updatePercent = () => {
+    if (selfUpdateTotal() === 0) return 0;
+    return Math.round((selfUpdateProgress() / selfUpdateTotal()) * 100);
+  };
+
   return (
     <div class="app">
       <Sidebar activePage={page()} onNavigate={setPage} />
@@ -90,11 +123,33 @@ function App() {
         <Show when={page() === "library"}>
           <LibraryPage onRefresh={loadData} />
         </Show>
+        <Show when={page() === "addtool"}>
+          <AddToolPage onRefresh={() => loadData(true)} />
+        </Show>
         <Show when={page() === "settings"}>
           <SettingsPage />
         </Show>
       </main>
       <ToastContainer />
+
+      {/* Self-update modal */}
+      <Show when={selfUpdateVisible()}>
+        <div class="modal-overlay">
+          <div class="modal-update">
+            <h3>Updating PyArsenal</h3>
+            <p class="modal-status">{selfUpdateStatus()}</p>
+            <div class="progress-bar modal-progress">
+              <div class="progress-fill" style={{ width: `${updatePercent()}%` }} />
+            </div>
+            <div class="modal-stats">
+              <span>{updatePercent()}%</span>
+              <span>
+                {formatBytes(selfUpdateProgress())} / {formatBytes(selfUpdateTotal())}
+              </span>
+            </div>
+          </div>
+        </div>
+      </Show>
     </div>
   );
 }

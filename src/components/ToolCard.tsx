@@ -5,10 +5,13 @@ import {
   installTool,
   uninstallTool,
   launchTool,
+  cancelInstall,
+  openInstallFolder,
   createToolShortcut,
   removeToolShortcut,
   toolShortcutExists,
   getPlatform,
+  getToolIcon,
 } from "../lib/api";
 import {
   installedTools,
@@ -32,6 +35,7 @@ export default function ToolCard(props: ToolCardProps) {
   const [busy, setBusy] = createSignal(false);
   const [hasShortcut, setHasShortcut] = createSignal(false);
   const [isLinux, setIsLinux] = createSignal(false);
+  const [iconSrc, setIconSrc] = createSignal("");
 
   onMount(async () => {
     try {
@@ -44,6 +48,13 @@ export default function ToolCard(props: ToolCardProps) {
         setHasShortcut(exists);
       } catch { /* ignore */ }
     }
+    // Load icon from tool's repo (assets/icon.png)
+    try {
+      const dataUrl = await getToolIcon(props.entry.repo, props.entry.id);
+      if (dataUrl) {
+        setIconSrc(dataUrl);
+      }
+    } catch { /* fallback to letter */ }
   });
 
   const isInstalled = () => !!installedTools()[props.entry.id];
@@ -176,7 +187,13 @@ export default function ToolCard(props: ToolCardProps) {
   return (
     <div class="tool-card">
       <div class="tool-card-header">
-        <div class="tool-icon">{props.entry.name[0]}</div>
+        <div class="tool-icon">
+          {iconSrc() ? (
+            <img src={iconSrc()} alt={props.entry.name} class="tool-icon-img" />
+          ) : (
+            props.entry.name[0]
+          )}
+        </div>
         <div class="tool-info">
           <h3>{props.entry.name}</h3>
           <div class="tool-meta">
@@ -227,14 +244,31 @@ export default function ToolCard(props: ToolCardProps) {
               <button class="btn btn-installed" disabled title="Already installed">
                 Installed
               </button>
+            ) : busy() ? (
+              <button
+                class="btn btn-uninstall"
+                onClick={async () => {
+                  await cancelInstall(props.entry.id);
+                  setBusy(false);
+                  setActiveDownloads((prev) => {
+                    const next = { ...prev };
+                    delete next[props.entry.id];
+                    return next;
+                  });
+                  showToast("info", "Installation cancelled.");
+                }}
+                title="Cancel installation"
+                style={{ "font-size": "13px", padding: "8px 16px" }}
+              >
+                Cancel
+              </button>
             ) : (
               <button
                 class="btn btn-install"
-                disabled={busy()}
                 onClick={handleInstall}
                 title={`Download and install ${props.entry.name}`}
               >
-                {busy() ? "Installing..." : "Install"}
+                Install
               </button>
             )}
             <button
@@ -252,14 +286,32 @@ export default function ToolCard(props: ToolCardProps) {
             <button class="btn btn-launch" onClick={handleLaunch} title={`Launch ${props.entry.name}`}>
               Launch
             </button>
-            {update() && (
+            {update() && !busy() && (
               <button
                 class="btn btn-update"
-                disabled={busy()}
                 onClick={handleUpdate}
                 title={`Update to v${update()!.latest_version}`}
               >
-                {busy() ? "Updating..." : "Update"}
+                Update
+              </button>
+            )}
+            {busy() && (
+              <button
+                class="btn btn-uninstall"
+                onClick={async () => {
+                  await cancelInstall(props.entry.id);
+                  setBusy(false);
+                  setActiveDownloads((prev) => {
+                    const next = { ...prev };
+                    delete next[props.entry.id];
+                    return next;
+                  });
+                  showToast("info", "Download cancelled.");
+                }}
+                title="Cancel download"
+                style={{ "font-size": "13px", padding: "8px 16px" }}
+              >
+                Cancel
               </button>
             )}
             <Show when={isLinux()}>
@@ -271,6 +323,16 @@ export default function ToolCard(props: ToolCardProps) {
                 {hasShortcut() ? "Shortcut \u2713" : "Shortcut"}
               </button>
             </Show>
+            <button
+              class="btn btn-bug"
+              onClick={async () => {
+                try { await openInstallFolder(props.entry.id); }
+                catch (e) { showToast("error", `${e}`); }
+              }}
+              title="Open install folder"
+            >
+              Folder
+            </button>
             <button
               class="btn btn-github"
               onClick={handleOpenRepo}

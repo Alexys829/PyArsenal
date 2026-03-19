@@ -92,10 +92,11 @@ impl GitHubClient {
         Ok(resp.bytes().await?)
     }
 
-    /// Download with streaming progress callback
+    /// Download with streaming progress callback and cancellation support
     pub async fn download_streaming(
         &self,
         url: &str,
+        cancel: tokio_util::sync::CancellationToken,
         mut on_progress: impl FnMut(u64, u64),
     ) -> AppResult<Vec<u8>> {
         use futures_util::StreamExt;
@@ -113,6 +114,9 @@ impl GitHubClient {
         let mut stream = resp.bytes_stream();
 
         while let Some(chunk) = stream.next().await {
+            if cancel.is_cancelled() {
+                return Err(AppError::Generic("Download cancelled".to_string()));
+            }
             let chunk = chunk?;
             downloaded += chunk.len() as u64;
             data.extend_from_slice(&chunk);

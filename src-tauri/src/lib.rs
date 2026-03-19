@@ -12,6 +12,7 @@ pub fn run() {
     tracing_subscriber::fmt::init();
 
     let github_client = GitHubClient::new();
+    let download_manager = commands::install::DownloadManager::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -19,13 +20,22 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(github_client)
+        .manage(download_manager)
         .invoke_handler(tauri::generate_handler![
+            commands::admin::scan_repo,
+            commands::admin::add_to_catalog,
+            commands::admin::remove_from_catalog,
+            commands::admin::update_in_catalog,
+            commands::admin::get_catalog_entries,
             commands::catalog::fetch_catalog,
+            commands::catalog::get_tool_icon,
             commands::install::install_tool,
+            commands::install::cancel_install,
             commands::install::uninstall_tool,
             commands::library::get_installed_tools,
             commands::update::check_all_updates,
             commands::launch::launch_tool,
+            commands::launch::open_install_folder,
             commands::settings::save_pat,
             commands::settings::get_pat,
             commands::settings::clear_pat,

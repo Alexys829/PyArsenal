@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 pub fn data_dir() -> PathBuf {
-    let base = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+    // Use LocalAppData on Windows, ~/.local/share on Linux
+    let base = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     let dir = base.join("pyarsenal");
     std::fs::create_dir_all(&dir).ok();
     dir
@@ -19,4 +20,10 @@ pub fn installed_db_path() -> PathBuf {
 
 pub fn catalog_cache_path() -> PathBuf {
     data_dir().join("catalog_cache.json")
+}
+
+pub fn icons_dir() -> PathBuf {
+    let dir = data_dir().join("icons");
+    std::fs::create_dir_all(&dir).ok();
+    dir
 }

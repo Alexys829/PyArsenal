@@ -30,3 +30,32 @@ pub async fn launch_tool(tool_id: String) -> AppResult<()> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn open_install_folder(tool_id: String) -> AppResult<()> {
+    let db = read_installed_db()?;
+    let tool = db
+        .tools
+        .get(&tool_id)
+        .ok_or_else(|| AppError::ToolNotInstalled(tool_id.clone()))?;
+
+    let folder = &tool.install_path;
+
+    #[cfg(unix)]
+    {
+        Command::new("xdg-open")
+            .arg(folder)
+            .spawn()
+            .map_err(|e| AppError::Generic(format!("Failed to open folder: {}", e)))?;
+    }
+
+    #[cfg(windows)]
+    {
+        Command::new("explorer")
+            .arg(folder)
+            .spawn()
+            .map_err(|e| AppError::Generic(format!("Failed to open folder: {}", e)))?;
+    }
+
+    Ok(())
+}

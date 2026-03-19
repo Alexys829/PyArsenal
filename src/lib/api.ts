@@ -1,8 +1,27 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CatalogEntry, InstalledTool, UpdateInfo } from "./types";
+import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult } from "./types";
 
 export const fetchCatalog = () =>
   invoke<CatalogEntry[]>("fetch_catalog");
+
+export const getToolIcon = (repo: string, toolId: string) =>
+  invoke<string>("get_tool_icon", { repo, toolId });
+
+// Admin
+export const scanRepo = (repoUrl: string) =>
+  invoke<RepoScanResult>("scan_repo", { repoUrl });
+
+export const addToCatalog = (entry: CatalogEntry) =>
+  invoke<void>("add_to_catalog", { entry });
+
+export const removeFromCatalog = (toolId: string) =>
+  invoke<void>("remove_from_catalog", { toolId });
+
+export const updateInCatalog = (entry: CatalogEntry) =>
+  invoke<void>("update_in_catalog", { entry });
+
+export const getCatalogEntries = () =>
+  invoke<CatalogEntry[]>("get_catalog_entries");
 
 export const getInstalledTools = () =>
   invoke<Record<string, InstalledTool>>("get_installed_tools");
@@ -13,11 +32,17 @@ export const installTool = (toolId: string, catalogEntry: CatalogEntry) =>
     catalogEntry,
   });
 
+export const cancelInstall = (toolId: string) =>
+  invoke<void>("cancel_install", { toolId });
+
 export const uninstallTool = (toolId: string) =>
   invoke<void>("uninstall_tool", { toolId });
 
 export const launchTool = (toolId: string) =>
   invoke<void>("launch_tool", { toolId });
+
+export const openInstallFolder = (toolId: string) =>
+  invoke<void>("open_install_folder", { toolId });
 
 export const checkAllUpdates = () =>
   invoke<UpdateInfo[]>("check_all_updates");

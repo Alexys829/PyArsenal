@@ -24,6 +24,13 @@ pub struct CatalogEntry {
     pub platforms: Vec<String>,
     pub asset_patterns: HashMap<String, String>,
     pub binary_name: HashMap<String, String>,
+    /// "binary" (default) | "archive" | "innosetup"
+    #[serde(default = "default_install_type")]
+    pub install_type: HashMap<String, String>,
+}
+
+fn default_install_type() -> HashMap<String, String> {
+    HashMap::new()
 }
 
 // ── Installed tools DB ──

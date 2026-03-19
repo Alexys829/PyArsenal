@@ -1,4 +1,5 @@
 import { createSignal, onMount, Show } from "solid-js";
+import { open } from "@tauri-apps/plugin-shell";
 import {
   getPat,
   savePat,
@@ -192,11 +193,26 @@ export default function SettingsPage() {
       </Show>
 
       <div class="settings-section">
-        <h3>GitHub Personal Access Token</h3>
+        <h3>GitHub Account</h3>
         <p class="settings-hint">
-          Optional. Increases GitHub API rate limit from 60 to 5,000 requests/hour.
+          Login to enable catalog management (add/edit/remove tools) and increase API rate limit from 60 to 5,000 requests/hour.
           The token is stored securely in your system keychain.
         </p>
+
+        <Show when={!hasPat()}>
+          <button
+            class="btn btn-install"
+            onClick={async () => {
+              await open("https://github.com/settings/tokens/new?scopes=repo&description=PyArsenal+Launcher");
+              showToast("info", "Create a token in the browser, then paste it below.");
+            }}
+          >
+            Login with GitHub
+          </button>
+          <p class="settings-hint" style={{ "margin-top": "10px", "margin-bottom": "0" }}>
+            After creating the token, paste it here:
+          </p>
+        </Show>
 
         <div class="pat-input-row">
           <input
@@ -257,7 +273,7 @@ export default function SettingsPage() {
       <div class="settings-section">
         <h3>About</h3>
         <p class="settings-hint">
-          PyArsenal v0.2.4 — Personal tool launcher
+          PyArsenal v0.3.0 — Personal tool launcher
         </p>
       </div>
     </div>
