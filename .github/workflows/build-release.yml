@@ -116,19 +116,22 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       - name: Prepare and sign updater bundle
-        shell: pwsh
+        shell: bash
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
-          $VERSION = "${{ steps.version.outputs.version }}"
-          $NSIS = "src-tauri\target\release\bundle\nsis"
-          $EXE = "$NSIS\PyArsenal_${VERSION}_x64-setup.exe"
-          # Create .nsis.zip for the updater
-          Compress-Archive -Path $EXE -DestinationPath "$NSIS\PyArsenal_${VERSION}_x64-setup.nsis.zip"
+          VERSION=${{ steps.version.outputs.version }}
+          NSIS="src-tauri/target/release/bundle/nsis"
+          EXE="PyArsenal_${VERSION}_x64-setup.exe"
+          ZIP="PyArsenal_${VERSION}_x64-setup.nsis.zip"
+          # Create .nsis.zip for the updater (zip must contain only the exe at root level)
+          cd "$NSIS"
+          7z a "$ZIP" "$EXE"
+          cd -
           # Install tauri-cli and sign
           cargo install tauri-cli --version "^2"
-          cargo tauri signer sign "$NSIS\PyArsenal_${VERSION}_x64-setup.nsis.zip" --private-key $env:TAURI_SIGNING_PRIVATE_KEY --password "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+          cargo tauri signer sign "${NSIS}/${ZIP}" --private-key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
 
       - name: Upload to release
         env:
@@ -173,23 +176,23 @@ jobs:
           LINUX_SIG=$(cat sigs/linux-sig/*.sig)
           WINDOWS_SIG=$(cat sigs/windows-sig/*.sig)
 
-          cat > latest.json << EOF
-          {
-            "version": "v${VERSION}",
-            "notes": "PyArsenal v${VERSION}",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "linux-x86_64": {
-                "signature": "${LINUX_SIG}",
-                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_amd64.AppImage.tar.gz"
-              },
-              "windows-x86_64": {
-                "signature": "${WINDOWS_SIG}",
-                "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_x64-setup.nsis.zip"
-              }
-            }
-          }
-          EOF
+          cat > latest.json <<EOF
+{
+  "version": "v${VERSION}",
+  "notes": "PyArsenal v${VERSION}",
+  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "platforms": {
+    "linux-x86_64": {
+      "signature": "${LINUX_SIG}",
+      "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_amd64.AppImage.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "${WINDOWS_SIG}",
+      "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_x64-setup.nsis.zip"
+    }
+  }
+}
+EOF
 
           echo "Generated latest.json:"
           cat latest.json

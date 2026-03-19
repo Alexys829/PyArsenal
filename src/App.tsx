@@ -1,6 +1,6 @@
 import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { relaunch, exit } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
 import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission } from "./lib/api";
 import type { DownloadProgress } from "./lib/types";
@@ -89,10 +89,26 @@ function App() {
       });
 
       setSelfUpdateStatus("Update installed! Restarting...");
-      await new Promise((r) => setTimeout(r, 1000));
-      await relaunch();
-    } catch {
+      await new Promise((r) => setTimeout(r, 1500));
+      // On Windows, the NSIS installer handles restart — just exit the app
+      // On Linux, relaunch works directly
+      try {
+        await relaunch();
+      } catch {
+        try {
+          // Fallback: exit and let the installer relaunch
+          await exit(0);
+        } catch {
+          setSelfUpdateStatus("Update installed! Please restart PyArsenal manually.");
+        }
+      }
+    } catch (e) {
+      const errMsg = String(e);
+      console.error("Self-update error:", e);
       setSelfUpdateVisible(false);
+      if (errMsg && !errMsg.includes("Up to date")) {
+        showToast("error", `Self-update failed: ${errMsg}`);
+      }
     }
   }
 
