@@ -257,7 +257,7 @@ export default function SettingsPage() {
       <div class="settings-section">
         <h3>About</h3>
         <p class="settings-hint">
-          PyArsenal v0.2.0 — Personal tool launcher
+          PyArsenal v0.2.1 — Personal tool launcher
         </p>
       </div>
     </div>
