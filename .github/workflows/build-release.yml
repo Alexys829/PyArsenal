@@ -175,25 +175,12 @@ jobs:
         run: |
           LINUX_SIG=$(cat sigs/linux-sig/*.sig)
           WINDOWS_SIG=$(cat sigs/windows-sig/*.sig)
-
-          cat > latest.json <<EOF
-{
-  "version": "v${VERSION}",
-  "notes": "PyArsenal v${VERSION}",
-  "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "platforms": {
-    "linux-x86_64": {
-      "signature": "${LINUX_SIG}",
-      "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_amd64.AppImage.tar.gz"
-    },
-    "windows-x86_64": {
-      "signature": "${WINDOWS_SIG}",
-      "url": "https://github.com/${REPO}/releases/download/v${VERSION}/PyArsenal_${VERSION}_x64-setup.nsis.zip"
-    }
-  }
-}
-EOF
-
+          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          printf '{\n  "version": "v%s",\n  "notes": "PyArsenal v%s",\n  "pub_date": "%s",\n  "platforms": {\n    "linux-x86_64": {\n      "signature": "%s",\n      "url": "https://github.com/%s/releases/download/v%s/PyArsenal_%s_amd64.AppImage.tar.gz"\n    },\n    "windows-x86_64": {\n      "signature": "%s",\n      "url": "https://github.com/%s/releases/download/v%s/PyArsenal_%s_x64-setup.nsis.zip"\n    }\n  }\n}\n' \
+            "$VERSION" "$VERSION" "$PUB_DATE" \
+            "$LINUX_SIG" "$REPO" "$VERSION" "$VERSION" \
+            "$WINDOWS_SIG" "$REPO" "$VERSION" "$VERSION" \
+            > latest.json
           echo "Generated latest.json:"
           cat latest.json
           gh release upload "v${VERSION}" latest.json --clobber --repo "${REPO}"
