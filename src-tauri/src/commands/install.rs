@@ -53,17 +53,8 @@ fn extract_archive(data: &[u8], dest: &Path, filename: &str) -> AppResult<()> {
         let mut archive =
             zip::ZipArchive::new(Cursor::new(data)).map_err(|e| AppError::Extraction(e.to_string()))?;
         archive.extract(dest).map_err(|e| AppError::Extraction(e.to_string()))?;
-    } else if filename.ends_with(".AppImage") || !filename.contains('.') {
-        // Single binary — just copy it
-        let bin_name = filename
-            .trim_end_matches(".AppImage")
-            .split('-')
-            .next()
-            .unwrap_or(filename);
-        let bin_path = dest.join(bin_name);
-        std::fs::write(&bin_path, data)?;
     } else {
-        // Unknown format, try writing as raw binary
+        // Single binary (.AppImage, .exe, or unknown) — save with original filename
         let bin_path = dest.join(filename);
         std::fs::write(&bin_path, data)?;
     }
@@ -136,6 +127,21 @@ pub async fn install_tool(
     let asset_filename = download_url.split('/').last().unwrap_or("binary");
     extract_archive(&data, &temp_dir, asset_filename)?;
 
+    // Determine the stable binary name from catalog
+    let platform = current_platform();
+    let binary_name = catalog_entry
+        .binary_name
+        .get(platform)
+        .cloned()
+        .unwrap_or_else(|| tool_id.clone());
+
+    // Rename downloaded file to the stable binary name (strips version from filename)
+    let downloaded_path = temp_dir.join(asset_filename);
+    let stable_path = temp_dir.join(&binary_name);
+    if downloaded_path.exists() && downloaded_path != stable_path {
+        std::fs::rename(&downloaded_path, &stable_path)?;
+    }
+
     // Set executable permissions on Linux
     set_executable(&temp_dir)?;
 
@@ -152,13 +158,6 @@ pub async fn install_tool(
         std::fs::rename(&temp_dir, &tool_dir)?;
     }
 
-    // Determine binary path
-    let platform = current_platform();
-    let binary_name = catalog_entry
-        .binary_name
-        .get(platform)
-        .cloned()
-        .unwrap_or_else(|| tool_id.clone());
     let binary_path = tool_dir.join(&binary_name);
 
     // Register in installed DB

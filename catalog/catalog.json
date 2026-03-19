@@ -1,54 +1,22 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-03-18T12:00:00Z",
+  "updated_at": "2026-03-19T12:00:00Z",
   "tools": [
     {
-      "id": "file-organizer",
-      "name": "File Organizer",
-      "description": "Automatically sorts files into folders by type, date, or custom rules. Keeps your Downloads folder clean.",
+      "id": "py-converter",
+      "name": "PyConverter",
+      "description": "Universal file converter: images, documents, data, audio, video. Includes 9 PDF tools, batch conversion, and drag & drop.",
       "category": "Utilities",
-      "icon": "file-organizer.png",
-      "repo": "Alexys829/file-organizer",
+      "icon": "py-converter.png",
+      "repo": "Alexys829/py-converter",
       "platforms": ["linux", "windows"],
       "asset_patterns": {
-        "linux": "file-organizer-{version}-linux-x86_64.tar.gz",
-        "windows": "file-organizer-{version}-windows-x86_64.zip"
+        "linux": "PyConverter-{version}-linux-x86_64.AppImage",
+        "windows": "PyConverter-{version}-windows-x86_64.exe"
       },
       "binary_name": {
-        "linux": "file-organizer",
-        "windows": "file-organizer.exe"
-      }
-    },
-    {
-      "id": "clipboard-manager",
-      "name": "Clipboard Manager",
-      "description": "Persistent clipboard history with search, pinning, and sync across devices.",
-      "category": "Productivity",
-      "icon": "clipboard-manager.png",
-      "repo": "Alexys829/clipboard-manager",
-      "platforms": ["linux", "windows"],
-      "asset_patterns": {
-        "linux": "clipmgr-{version}-linux-x86_64.tar.gz",
-        "windows": "clipmgr-{version}-windows-x86_64.zip"
-      },
-      "binary_name": {
-        "linux": "clipmgr",
-        "windows": "clipmgr.exe"
-      }
-    },
-    {
-      "id": "screenshot-tool",
-      "name": "Screenshot Tool",
-      "description": "Region capture with annotation, blur, arrows, and quick share via link.",
-      "category": "Utilities",
-      "icon": "screenshot-tool.png",
-      "repo": "Alexys829/screenshot-tool",
-      "platforms": ["linux"],
-      "asset_patterns": {
-        "linux": "screenshot-tool-{version}-linux-x86_64.AppImage"
-      },
-      "binary_name": {
-        "linux": "screenshot-tool"
+        "linux": "PyConverter.AppImage",
+        "windows": "PyConverter.exe"
       }
     }
   ]
