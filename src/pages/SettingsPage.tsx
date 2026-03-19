@@ -4,6 +4,7 @@ import {
   savePat,
   clearPat,
   getRateLimit,
+  getPlatform,
   getAppimagePath,
   desktopFileExists,
   addToAppMenu,
@@ -38,27 +39,20 @@ export default function SettingsPage() {
     }
     refreshRateLimit();
 
-    // Desktop integration - detect AppImage and status
+    // Desktop integration - only show on Linux
     try {
-      const detected = await getAppimagePath();
-      if (detected !== null) {
+      const platform = await getPlatform();
+      if (platform === "linux") {
         setIsLinux(true);
-        setAppimagePath(detected);
-      } else {
-        // Check if we're on Linux anyway (env var absent = not running as AppImage)
+        const detected = await getAppimagePath();
+        if (detected) {
+          setAppimagePath(detected);
+        }
         const exists = await desktopFileExists();
-        setIsLinux(true);
         setIsDesktopInstalled(exists);
       }
     } catch {
       // Not on Linux or error
-    }
-
-    try {
-      const exists = await desktopFileExists();
-      setIsDesktopInstalled(exists);
-    } catch {
-      // Ignore
     }
   });
 

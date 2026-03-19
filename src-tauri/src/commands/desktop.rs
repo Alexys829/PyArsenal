@@ -1,6 +1,12 @@
 use std::path::PathBuf;
 
 use crate::error::{AppError, AppResult};
+use crate::models::current_platform;
+
+#[tauri::command]
+pub async fn get_platform() -> AppResult<String> {
+    Ok(current_platform().to_string())
+}
 
 const APP_NAME: &str = "PyArsenal";
 const APP_COMMENT: &str = "Personal tool distribution and update launcher";

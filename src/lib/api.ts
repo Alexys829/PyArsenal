@@ -35,6 +35,9 @@ export const getRateLimit = () =>
   invoke<[number, number]>("get_rate_limit");
 
 // Desktop integration (Linux AppImage)
+export const getPlatform = () =>
+  invoke<string>("get_platform");
+
 export const getAppimagePath = () =>
   invoke<string | null>("get_appimage_path");
 
