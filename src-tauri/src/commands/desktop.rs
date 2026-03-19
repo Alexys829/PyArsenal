@@ -58,38 +58,23 @@ fn set_file_executable(path: &std::path::Path) {
     }
 }
 
+// Embed the app icon at compile time
+const APP_ICON_PNG: &[u8] = include_bytes!("../../icons/128x128.png");
+
 /// Install the PyArsenal icon into the standard icon theme directory (Linux)
 #[cfg(unix)]
 fn install_app_icon_linux() -> Option<PathBuf> {
     let icon_dest = linux_icons_dir().join("pyarsenal.png");
-    if icon_dest.exists() {
-        return Some(icon_dest);
+    if !icon_dest.exists() {
+        std::fs::write(&icon_dest, APP_ICON_PNG).ok();
     }
-    // Try to find icon from the bundled Tauri resources
-    // The AppImage extracts icons to /tmp/.mount_*/usr/share/icons/
-    if let Ok(appimage) = std::env::var("APPIMAGE") {
-        // Try common icon locations near the AppImage
-        let appimage_path = std::path::Path::new(&appimage);
-        if let Some(dir) = appimage_path.parent() {
-            let candidates = [
-                dir.join("icons").join("128x128.png"),
-                dir.join("pyarsenal.png"),
-            ];
-            for c in &candidates {
-                if c.exists() {
-                    std::fs::copy(c, &icon_dest).ok();
-                    return Some(icon_dest);
-                }
-            }
-        }
-    }
-    // Use a cached icon from our data dir if available
-    let cached = icons_dir().join("pyarsenal-app.png");
-    if cached.exists() {
-        std::fs::copy(&cached, &icon_dest).ok();
-        return Some(icon_dest);
-    }
-    None
+    Some(icon_dest)
+}
+
+/// Called on startup to ensure the app icon is installed
+#[cfg(unix)]
+pub fn ensure_app_icon() {
+    install_app_icon_linux();
 }
 
 /// Get the icon path for a tool (from our icon cache)
@@ -139,6 +124,19 @@ fn create_windows_shortcut(lnk_path: &std::path::Path, target: &str, name: &str,
         icon_arg.replace('\'', "''"),
     );
 
+    #[cfg(windows)]
+    let status = {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &ps_script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map_err(|e| AppError::Generic(format!("Failed to create shortcut: {}", e)))?
+    };
+    #[cfg(not(windows))]
     let status = std::process::Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
         .stdout(std::process::Stdio::null())

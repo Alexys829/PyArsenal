@@ -52,6 +52,10 @@ pub fn run() {
             commands::desktop::tool_shortcut_exists,
         ])
         .setup(|app| {
+            // Install app icon on Linux
+            #[cfg(unix)]
+            commands::desktop::ensure_app_icon();
+
             // Load PAT from keychain on startup
             let handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
