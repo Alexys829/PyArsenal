@@ -127,7 +127,7 @@ jobs:
           ZIP="PyArsenal_${VERSION}_x64-setup.nsis.zip"
           # Create .nsis.zip for the updater (zip must contain only the exe at root level)
           cd "$NSIS"
-          7z a "$ZIP" "$EXE"
+          7z a -tzip -mm=Deflate "$ZIP" "$EXE"
           cd -
           # Install tauri-cli and sign
           cargo install tauri-cli --version "^2"
