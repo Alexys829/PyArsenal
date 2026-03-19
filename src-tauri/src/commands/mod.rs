@@ -1,4 +1,5 @@
 pub mod catalog;
+pub mod desktop;
 pub mod install;
 pub mod launch;
 pub mod library;

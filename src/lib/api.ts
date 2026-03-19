@@ -33,3 +33,16 @@ export const clearPat = () =>
 
 export const getRateLimit = () =>
   invoke<[number, number]>("get_rate_limit");
+
+// Desktop integration (Linux AppImage)
+export const getAppimagePath = () =>
+  invoke<string | null>("get_appimage_path");
+
+export const desktopFileExists = () =>
+  invoke<boolean>("desktop_file_exists");
+
+export const addToAppMenu = (appimagePath: string) =>
+  invoke<void>("add_to_app_menu", { appimagePath });
+
+export const removeFromAppMenu = () =>
+  invoke<boolean>("remove_from_app_menu");
