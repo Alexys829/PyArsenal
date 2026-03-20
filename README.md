@@ -17,7 +17,14 @@ Browse, install, update, and launch your personal tools from a single app. Tools
 
 ## Screenshots
 
-*Coming soon*
+<img width="1330" height="958" alt="image" src="https://github.com/user-attachments/assets/a9913e7e-ee71-4ef8-8d10-17a4fd33a9b9" />
+
+<img width="1330" height="958" alt="image" src="https://github.com/user-attachments/assets/5371cc65-08b8-44bf-b459-a3f97713d6c1" />
+
+<img width="1330" height="958" alt="image" src="https://github.com/user-attachments/assets/c4971c97-99c9-46bf-905e-d02764390eb7" />
+
+<img width="1330" height="958" alt="image" src="https://github.com/user-attachments/assets/4822cb82-8171-426e-a6ce-1b29bf04e6f8" />
+
 
 ## Stack
 
