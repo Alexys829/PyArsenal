@@ -116,22 +116,24 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
       - name: Prepare and sign updater bundle
-        shell: bash
+        shell: pwsh
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_KEY_PASSWORD }}
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          NSIS="src-tauri/target/release/bundle/nsis"
-          EXE="PyArsenal_${VERSION}_x64-setup.exe"
-          ZIP="PyArsenal_${VERSION}_x64-setup.nsis.zip"
-          # Create .nsis.zip for the updater (zip must contain only the exe at root level)
-          cd "$NSIS"
-          7z a -tzip -mm=Deflate "$ZIP" "$EXE"
-          cd -
-          # Install tauri-cli and sign
+          $VERSION = "${{ steps.version.outputs.version }}"
+          $NSIS = "src-tauri\target\release\bundle\nsis"
+          $EXE_PATH = "$NSIS\PyArsenal_${VERSION}_x64-setup.exe"
+          $ZIP_PATH = "$NSIS\PyArsenal_${VERSION}_x64-setup.nsis.zip"
+          # Create zip using .NET with explicit Deflate compression (Optimal = Deflate)
+          Add-Type -Assembly System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::Open($ZIP_PATH, 'Create')
+          [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $EXE_PATH, "PyArsenal_${VERSION}_x64-setup.exe", [System.IO.Compression.CompressionLevel]::Optimal)
+          $zip.Dispose()
+          Write-Host "Created zip: $ZIP_PATH"
+          # Sign
           cargo install tauri-cli --version "^2"
-          cargo tauri signer sign "${NSIS}/${ZIP}" --private-key "$TAURI_SIGNING_PRIVATE_KEY" --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+          cargo tauri signer sign $ZIP_PATH --private-key $env:TAURI_SIGNING_PRIVATE_KEY --password "$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
 
       - name: Upload to release
         env:

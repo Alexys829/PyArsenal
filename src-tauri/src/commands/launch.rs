@@ -53,6 +53,8 @@ pub async fn launch_tool_admin(tool_id: String) -> AppResult<()> {
 
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
         // Use ShellExecuteW with "runas" verb to trigger UAC elevation
         Command::new("powershell")
             .args([
@@ -60,6 +62,7 @@ pub async fn launch_tool_admin(tool_id: String) -> AppResult<()> {
                 "-Command",
                 &format!("Start-Process '{}' -Verb RunAs", binary.replace('\'', "''")),
             ])
+            .creation_flags(CREATE_NO_WINDOW)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
