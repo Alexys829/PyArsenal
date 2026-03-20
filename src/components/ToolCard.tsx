@@ -282,7 +282,6 @@ export default function ToolCard(props: ToolCardProps) {
                 <button class="btn btn-launch" onClick={handleLaunch} title={`Launch ${props.entry.name}`}>
                   <PlayIcon /> Launch
                 </button>
-                <span class="installed-label">Installed</span>
               </>
             ) : busy() ? (
               <button class="btn btn-cancel" onClick={handleCancel} title="Cancel installation">
