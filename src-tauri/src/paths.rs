@@ -27,3 +27,7 @@ pub fn icons_dir() -> PathBuf {
     std::fs::create_dir_all(&dir).ok();
     dir
 }
+
+pub fn theme_config_path() -> PathBuf {
+    data_dir().join("theme.json")
+}

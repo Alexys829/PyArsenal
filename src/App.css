@@ -19,6 +19,8 @@
   --success: #5ba32b;
   --warning: #e8a427;
   --danger: #c44040;
+  --icon-gradient-start: #66c0f4;
+  --icon-gradient-end: #4a9eda;
   --radius: 8px;
 }
 
@@ -285,7 +287,7 @@ body {
 .tool-icon {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, var(--accent), #4a9eda);
+  background: linear-gradient(135deg, var(--icon-gradient-start), var(--icon-gradient-end));
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -1023,6 +1025,188 @@ select.form-input option {
   justify-content: space-between;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* ── Theme Page ── */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.theme-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.theme-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.theme-card-active {
+  border-color: var(--accent);
+}
+
+.theme-preview {
+  display: flex;
+  height: 110px;
+  overflow: hidden;
+}
+
+.theme-preview-sidebar {
+  width: 40px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.theme-preview-logo {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  opacity: 0.9;
+}
+
+.theme-preview-nav-item {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.theme-preview-content {
+  flex: 1;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.theme-preview-header {
+  width: 50%;
+  height: 6px;
+  border-radius: 3px;
+  opacity: 0.4;
+}
+
+.theme-preview-cards {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.theme-preview-card {
+  flex: 1;
+  border-radius: 4px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-preview-card-line {
+  height: 3px;
+  border-radius: 2px;
+  opacity: 0.6;
+}
+
+.theme-preview-card-btn {
+  width: 40%;
+  height: 6px;
+  border-radius: 3px;
+  margin-top: auto;
+  opacity: 0.9;
+}
+
+.theme-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.theme-card-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.theme-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* ── Color Editor ── */
+.color-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.color-editor-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.color-editor-swatch-wrap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
+.color-editor-picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.color-editor-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  pointer-events: none;
+}
+
+.color-editor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.color-editor-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.color-editor-hex {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: monospace;
+  width: 80px;
+  padding: 0;
+}
+
+.color-editor-hex:focus {
+  color: var(--text);
 }
 
 /* ── Scrollbar ── */

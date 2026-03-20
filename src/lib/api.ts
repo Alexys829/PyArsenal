@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile } from "./types";
+import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile, ThemeConfig } from "./types";
 
 export const fetchCatalog = () =>
   invoke<CatalogEntry[]>("fetch_catalog");
@@ -115,3 +115,10 @@ export const removeToolShortcut = (toolId: string, toolName: string) =>
 
 export const toolShortcutExists = (toolId: string, toolName: string) =>
   invoke<boolean>("tool_shortcut_exists", { toolId, toolName });
+
+// Theme
+export const getThemeConfig = () =>
+  invoke<ThemeConfig>("get_theme_config");
+
+export const saveThemeConfig = (config: ThemeConfig) =>
+  invoke<void>("save_theme_config", { config });

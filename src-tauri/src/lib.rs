@@ -51,6 +51,8 @@ pub fn run() {
             commands::settings::get_pat,
             commands::settings::clear_pat,
             commands::settings::get_rate_limit,
+            commands::settings::get_theme_config,
+            commands::settings::save_theme_config,
             commands::desktop::get_platform,
             commands::desktop::get_appimage_path,
             commands::desktop::desktop_file_exists,

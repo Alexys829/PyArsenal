@@ -2,7 +2,7 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch, exit } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
-import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission, getFavorites, getLaunchCounts } from "./lib/api";
+import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission, getFavorites, getLaunchCounts, getThemeConfig } from "./lib/api";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { DownloadProgress } from "./lib/types";
 import {
@@ -23,6 +23,8 @@ import LibraryPage from "./pages/LibraryPage";
 import SettingsPage from "./pages/SettingsPage";
 import AddToolPage from "./pages/AddToolPage";
 import StatsPage from "./pages/StatsPage";
+import ThemesPage from "./pages/ThemesPage";
+import { applyTheme, getPresetById } from "./lib/themes";
 import "./App.css";
 
 function App() {
@@ -157,6 +159,17 @@ function App() {
     loadData();
     checkSelfUpdate();
     checkCatalogPermission().then(setCanManageCatalog).catch(() => {});
+
+    // Load saved theme
+    getThemeConfig().then((config) => {
+      const preset = getPresetById(config.active);
+      if (preset) {
+        applyTheme(preset.colors);
+      } else {
+        const custom = config.custom_themes.find((t) => t.id === config.active);
+        if (custom) applyTheme(custom.colors);
+      }
+    }).catch(() => {});
   });
 
   const updatePercent = () => {
@@ -179,6 +192,9 @@ function App() {
         </Show>
         <Show when={page() === "stats"}>
           <StatsPage />
+        </Show>
+        <Show when={page() === "themes"}>
+          <ThemesPage />
         </Show>
         <Show when={page() === "settings"}>
           <SettingsPage />

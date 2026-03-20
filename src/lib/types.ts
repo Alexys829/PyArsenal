@@ -72,3 +72,14 @@ export interface ExportProfile {
   tools: { id: string; name: string; version: string; repo: string }[];
   favorites: string[];
 }
+
+export interface CustomTheme {
+  id: string;
+  name: string;
+  colors: Record<string, string>;
+}
+
+export interface ThemeConfig {
+  active: string;
+  custom_themes: CustomTheme[];
+}
