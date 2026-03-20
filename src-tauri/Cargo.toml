@@ -1,6 +1,6 @@
 [package]
 name = "pyarsenal"
-version = "0.3.6"
+version = "0.3.7"
 description = "Personal tool distribution and update launcher"
 authors = ["Alessandro"]
 edition = "2021"

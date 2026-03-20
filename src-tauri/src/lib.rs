@@ -37,6 +37,7 @@ pub fn run() {
             commands::library::get_installed_tools,
             commands::update::check_all_updates,
             commands::launch::launch_tool,
+            commands::launch::launch_tool_admin,
             commands::launch::open_install_folder,
             commands::settings::save_pat,
             commands::settings::get_pat,

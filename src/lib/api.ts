@@ -47,6 +47,9 @@ export const uninstallTool = (toolId: string) =>
 export const launchTool = (toolId: string) =>
   invoke<void>("launch_tool", { toolId });
 
+export const launchToolAdmin = (toolId: string) =>
+  invoke<void>("launch_tool_admin", { toolId });
+
 export const openInstallFolder = (toolId: string) =>
   invoke<void>("open_install_folder", { toolId });
 

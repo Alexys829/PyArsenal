@@ -40,6 +40,48 @@ pub async fn launch_tool(tool_id: String) -> AppResult<()> {
     Ok(())
 }
 
+/// Launch a tool with administrator/root privileges
+#[tauri::command]
+pub async fn launch_tool_admin(tool_id: String) -> AppResult<()> {
+    let db = read_installed_db()?;
+    let tool = db
+        .tools
+        .get(&tool_id)
+        .ok_or_else(|| AppError::ToolNotInstalled(tool_id.clone()))?;
+
+    let binary = &tool.binary_path;
+
+    #[cfg(windows)]
+    {
+        // Use ShellExecuteW with "runas" verb to trigger UAC elevation
+        Command::new("powershell")
+            .args([
+                "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden",
+                "-Command",
+                &format!("Start-Process '{}' -Verb RunAs", binary.replace('\'', "''")),
+            ])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| AppError::Generic(format!("Failed to launch as admin: {}", e)))?;
+    }
+
+    #[cfg(unix)]
+    {
+        // Try pkexec (graphical sudo) on Linux
+        Command::new("pkexec")
+            .arg(binary)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| AppError::Generic(format!("Failed to launch as admin: {}", e)))?;
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn open_install_folder(tool_id: String) -> AppResult<()> {
     let db = read_installed_db()?;
