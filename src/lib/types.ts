@@ -9,8 +9,8 @@ export interface CatalogEntry {
   platforms: string[];
   asset_patterns: Record<string, string>;
   binary_name: Record<string, string>;
-  /** "binary" (default) | "archive" | "innosetup" — per platform */
   install_type: Record<string, string>;
+  tags: string[];
 }
 
 export interface InstalledTool {
@@ -29,6 +29,8 @@ export interface UpdateInfo {
   tool_id: string;
   current_version: string;
   latest_version: string;
+  release_date: string;
+  release_notes: string;
 }
 
 export interface RepoScanResult {
@@ -49,4 +51,24 @@ export interface DownloadProgress {
   downloaded: number;
   total: number;
   speed_bps: number;
+}
+
+export interface ReleaseInfo {
+  version: string;
+  name: string;
+  body: string;
+  published_at: string;
+}
+
+export interface AppStats {
+  total_tools: number;
+  installed_tools: number;
+  total_size_bytes: number;
+  most_launched: [string, number][];
+}
+
+export interface ExportProfile {
+  exported_at: string;
+  tools: { id: string; name: string; version: string; repo: string }[];
+  favorites: string[];
 }

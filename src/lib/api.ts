@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult } from "./types";
+import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile } from "./types";
 
 export const fetchCatalog = () =>
   invoke<CatalogEntry[]>("fetch_catalog");
@@ -33,10 +33,7 @@ export const getInstalledTools = () =>
   invoke<Record<string, InstalledTool>>("get_installed_tools");
 
 export const installTool = (toolId: string, catalogEntry: CatalogEntry) =>
-  invoke<InstalledTool>("install_tool", {
-    toolId,
-    catalogEntry,
-  });
+  invoke<InstalledTool>("install_tool", { toolId, catalogEntry });
 
 export const cancelInstall = (toolId: string) =>
   invoke<void>("cancel_install", { toolId });
@@ -56,6 +53,32 @@ export const openInstallFolder = (toolId: string) =>
 export const checkAllUpdates = () =>
   invoke<UpdateInfo[]>("check_all_updates");
 
+// Favorites
+export const toggleFavorite = (toolId: string) =>
+  invoke<boolean>("toggle_favorite", { toolId });
+
+export const getFavorites = () =>
+  invoke<string[]>("get_favorites");
+
+// Stats & Counts
+export const getLaunchCounts = () =>
+  invoke<Record<string, number>>("get_launch_counts");
+
+export const getStats = () =>
+  invoke<AppStats>("get_stats");
+
+// Changelog
+export const getToolChangelog = (repo: string) =>
+  invoke<ReleaseInfo[]>("get_tool_changelog", { repo });
+
+// Export/Import
+export const exportProfile = () =>
+  invoke<string>("export_profile");
+
+export const importProfile = (json: string) =>
+  invoke<ExportProfile>("import_profile", { json });
+
+// Settings
 export const savePat = (pat: string) =>
   invoke<void>("save_pat", { pat });
 
@@ -68,7 +91,7 @@ export const clearPat = () =>
 export const getRateLimit = () =>
   invoke<[number, number]>("get_rate_limit");
 
-// Desktop integration (Linux AppImage)
+// Desktop integration
 export const getPlatform = () =>
   invoke<string>("get_platform");
 
@@ -84,8 +107,6 @@ export const addToAppMenu = (appimagePath: string) =>
 export const removeFromAppMenu = () =>
   invoke<boolean>("remove_from_app_menu");
 
-// Tool shortcuts (cross-platform)
-// shortcutType: "desktop" | "startmenu" | "both" (Windows), ignored on Linux
 export const createToolShortcut = (toolId: string, toolName: string, binaryPath: string, shortcutType: string = "both") =>
   invoke<void>("create_tool_shortcut", { toolId, toolName, binaryPath, shortcutType });
 

@@ -2,13 +2,16 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch, exit } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
-import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission } from "./lib/api";
+import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission, getFavorites, getLaunchCounts } from "./lib/api";
+import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { DownloadProgress } from "./lib/types";
 import {
   setCatalog,
   setInstalledTools,
   setUpdates,
   setActiveDownloads,
+  setFavorites,
+  setLaunchCounts,
   setLoading,
   showToast,
   formatBytes,
@@ -19,6 +22,7 @@ import StorePage from "./pages/StorePage";
 import LibraryPage from "./pages/LibraryPage";
 import SettingsPage from "./pages/SettingsPage";
 import AddToolPage from "./pages/AddToolPage";
+import StatsPage from "./pages/StatsPage";
 import "./App.css";
 
 function App() {
@@ -28,6 +32,7 @@ function App() {
   const [selfUpdateTotal, setSelfUpdateTotal] = createSignal(0);
   const [selfUpdateVisible, setSelfUpdateVisible] = createSignal(false);
   const [canManageCatalog, setCanManageCatalog] = createSignal(false);
+  const [globalSearch, setGlobalSearch] = createSignal("");
 
   async function loadData(forceApi?: boolean) {
     setLoading(true);
@@ -48,12 +53,25 @@ function App() {
       setLoading(false);
     }
 
+    // Load favorites and launch counts
+    getFavorites().then(setFavorites).catch(() => {});
+    getLaunchCounts().then(setLaunchCounts).catch(() => {});
+
     // Check updates in background
     try {
       const updateList = await checkAllUpdates();
       setUpdates(updateList);
       if (updateList.length > 0) {
         showToast("info", `${updateList.length} update(s) available.`);
+        // Desktop notification
+        try {
+          let granted = await isPermissionGranted();
+          if (!granted) granted = (await requestPermission()) === "granted";
+          if (granted) {
+            const names = updateList.map((u) => u.tool_id).join(", ");
+            sendNotification({ title: "PyArsenal", body: `${updateList.length} update(s) available: ${names}` });
+          }
+        } catch { /* no notification support */ }
       }
     } catch {
       // Silent fail for update check
@@ -121,6 +139,21 @@ function App() {
     });
     onCleanup(() => unlisten());
 
+    // Ctrl+K global search
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setPage("store");
+        // Focus the search input
+        setTimeout(() => {
+          const input = document.querySelector(".search-bar input") as HTMLInputElement;
+          if (input) input.focus();
+        }, 100);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    onCleanup(() => document.removeEventListener("keydown", handleKeyDown));
+
     loadData();
     checkSelfUpdate();
     checkCatalogPermission().then(setCanManageCatalog).catch(() => {});
@@ -143,6 +176,9 @@ function App() {
         </Show>
         <Show when={page() === "addtool"}>
           <AddToolPage onRefresh={() => loadData(true)} />
+        </Show>
+        <Show when={page() === "stats"}>
+          <StatsPage />
         </Show>
         <Show when={page() === "settings"}>
           <SettingsPage />

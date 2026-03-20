@@ -11,17 +11,23 @@ import {
   createToolShortcut,
   removeToolShortcut,
   toolShortcutExists,
+  toggleFavorite,
+  getToolChangelog,
   getPlatform,
   getToolIcon,
 } from "../lib/api";
+import type { ReleaseInfo } from "../lib/types";
 import {
   installedTools,
   setInstalledTools,
   updates,
   activeDownloads,
   setActiveDownloads,
+  favorites,
+  setFavorites,
   showToast,
   formatBytes,
+  formatDate,
 } from "../lib/stores";
 
 // SVG Icons
@@ -36,6 +42,9 @@ const GitHubIcon = () => <svg viewBox="0 0 16 16" fill="currentColor" width="14"
 const ShortcutIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M19 19H5V5h7V3H5a2 2 0 00-2 2v14a2 2 0 002 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>;
 const CheckIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>;
 const ShieldIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>;
+const StarIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>;
+const StarOutlineIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M22 9.24l-7.19-.62L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.63-7.03L22 9.24zM12 15.4l-3.76 2.27 1-4.28-3.32-2.88 4.38-.38L12 6.1l1.71 4.04 4.38.38-3.32 2.88 1 4.28L12 15.4z"/></svg>;
+const ChangelogIcon = () => <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>;
 
 interface ToolCardProps {
   entry: CatalogEntry;
@@ -51,9 +60,12 @@ export default function ToolCard(props: ToolCardProps) {
   const [currentPlatform, setCurrentPlatform] = createSignal("");
   const [iconSrc, setIconSrc] = createSignal("");
   const [confirmUninstall, setConfirmUninstall] = createSignal(false);
+  const [showChangelog, setShowChangelog] = createSignal(false);
+  const [changelog, setChangelog] = createSignal<ReleaseInfo[]>([]);
 
   const isLinux = () => currentPlatform() === "linux";
   const isWindows = () => currentPlatform() === "windows";
+  const isFav = () => favorites().includes(props.entry.id);
 
   onMount(async () => {
     try {
@@ -172,6 +184,27 @@ export default function ToolCard(props: ToolCardProps) {
     } catch (e) { showToast("error", `${e}`); }
   }
 
+  async function handleToggleFavorite() {
+    try {
+      const newState = await toggleFavorite(props.entry.id);
+      setFavorites((prev) =>
+        newState ? [...prev, props.entry.id] : prev.filter((f) => f !== props.entry.id)
+      );
+    } catch (e) { showToast("error", `${e}`); }
+  }
+
+  async function handleShowChangelog() {
+    if (showChangelog()) {
+      setShowChangelog(false);
+      return;
+    }
+    try {
+      const releases = await getToolChangelog(props.entry.repo);
+      setChangelog(releases);
+      setShowChangelog(true);
+    } catch (e) { showToast("error", `Failed to load changelog: ${e}`); }
+  }
+
   const categoryClass = () => {
     switch (props.entry.category.toLowerCase()) {
       case "utilities": return "cat-utilities";
@@ -203,8 +236,20 @@ export default function ToolCard(props: ToolCardProps) {
             <span class="tool-author">by {author()}</span>
           </div>
         </div>
+        <button
+          class={`btn-fav ${isFav() ? "btn-fav-active" : ""}`}
+          onClick={handleToggleFavorite}
+          title={isFav() ? "Remove from favorites" : "Add to favorites"}
+        >
+          {isFav() ? <StarIcon /> : <StarOutlineIcon />}
+        </button>
       </div>
       <p class="tool-description">{props.entry.description}</p>
+      {props.entry.tags && props.entry.tags.length > 0 && (
+        <div class="tool-tags">
+          {props.entry.tags.map((tag) => <span class="tool-tag">{tag}</span>)}
+        </div>
+      )}
 
       {props.mode === "library" && props.installedTool && (
         <div class="tool-version">
@@ -299,6 +344,9 @@ export default function ToolCard(props: ToolCardProps) {
             <button class="btn btn-icon" onClick={() => open(`https://github.com/${props.entry.repo}`)} title="View on GitHub">
               <GitHubIcon />
             </button>
+            <button class={`btn ${showChangelog() ? "btn-icon-active" : "btn-icon"}`} onClick={handleShowChangelog} title="Changelog">
+              <ChangelogIcon />
+            </button>
             <button class="btn btn-icon" onClick={() => open(`https://github.com/${props.entry.repo}/issues/new`)} title="Report bug">
               <BugIcon />
             </button>
@@ -314,6 +362,30 @@ export default function ToolCard(props: ToolCardProps) {
           </>
         )}
       </div>
+
+      {/* Update release notes */}
+      <Show when={update()?.release_notes}>
+        <div class="release-notes-preview">
+          <strong>v{update()!.latest_version}</strong>
+          {update()!.release_date && <span class="release-date">{formatDate(update()!.release_date)}</span>}
+          <p>{update()!.release_notes.slice(0, 200)}{update()!.release_notes.length > 200 ? "..." : ""}</p>
+        </div>
+      </Show>
+
+      {/* Changelog panel */}
+      <Show when={showChangelog() && changelog().length > 0}>
+        <div class="changelog-panel">
+          {changelog().map((r) => (
+            <div class="changelog-entry">
+              <div class="changelog-header">
+                <strong>{r.version}</strong>
+                <span class="release-date">{formatDate(r.published_at)}</span>
+              </div>
+              <p class="changelog-body">{r.body || "No release notes."}</p>
+            </div>
+          ))}
+        </div>
+      </Show>
     </div>
   );
 }

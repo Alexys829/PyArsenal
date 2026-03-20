@@ -1,4 +1,4 @@
-use tauri::State;
+use tauri::{Emitter, State, AppHandle};
 
 use crate::commands::library::read_installed_db;
 use crate::error::AppResult;
@@ -7,6 +7,7 @@ use crate::models::UpdateInfo;
 
 #[tauri::command]
 pub async fn check_all_updates(
+    app: AppHandle,
     github: State<'_, GitHubClient>,
 ) -> AppResult<Vec<UpdateInfo>> {
     let db = read_installed_db()?;
@@ -18,7 +19,6 @@ pub async fn check_all_updates(
                 let latest = release.tag_name.trim_start_matches('v').to_string();
                 let current = tool.installed_version.trim_start_matches('v');
 
-                // Try semver comparison, fallback to string comparison
                 let is_newer = match (
                     semver::Version::parse(&latest),
                     semver::Version::parse(current),
@@ -32,14 +32,20 @@ pub async fn check_all_updates(
                         tool_id: id.clone(),
                         current_version: current.to_string(),
                         latest_version: latest,
+                        release_date: release.published_at.unwrap_or_default(),
+                        release_notes: release.body.unwrap_or_default(),
                     });
                 }
             }
-            Err(_) => {
-                // Skip tools we can't check — don't fail the whole check
-                continue;
-            }
+            Err(_) => continue,
         }
+    }
+
+    // Send desktop notification if updates available
+    if !updates.is_empty() {
+        let names: Vec<_> = updates.iter().map(|u| u.tool_id.clone()).collect();
+        let msg = format!("{} update(s) available: {}", updates.len(), names.join(", "));
+        app.emit("desktop-notification", msg).ok();
     }
 
     Ok(updates)

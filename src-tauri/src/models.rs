@@ -24,9 +24,10 @@ pub struct CatalogEntry {
     pub platforms: Vec<String>,
     pub asset_patterns: HashMap<String, String>,
     pub binary_name: HashMap<String, String>,
-    /// "binary" (default) | "archive" | "innosetup"
     #[serde(default = "default_install_type")]
     pub install_type: HashMap<String, String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 fn default_install_type() -> HashMap<String, String> {
@@ -39,6 +40,10 @@ fn default_install_type() -> HashMap<String, String> {
 pub struct InstalledDb {
     pub format_version: u32,
     pub tools: HashMap<String, InstalledTool>,
+    #[serde(default)]
+    pub favorites: Vec<String>,
+    #[serde(default)]
+    pub launch_counts: HashMap<String, u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +66,7 @@ pub struct InstalledTool {
 pub struct GitHubRelease {
     pub tag_name: String,
     pub name: Option<String>,
+    pub body: Option<String>,
     pub assets: Vec<GitHubAsset>,
     pub published_at: Option<String>,
 }
@@ -79,6 +85,8 @@ pub struct UpdateInfo {
     pub tool_id: String,
     pub current_version: String,
     pub latest_version: String,
+    pub release_date: String,
+    pub release_notes: String,
 }
 
 // ── Download progress event ──
@@ -89,6 +97,16 @@ pub struct DownloadProgress {
     pub downloaded: u64,
     pub total: u64,
     pub speed_bps: u64,
+}
+
+// ── Statistics ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppStats {
+    pub total_tools: u32,
+    pub installed_tools: u32,
+    pub total_size_bytes: u64,
+    pub most_launched: Vec<(String, u32)>,
 }
 
 // ── Platform detection ──

@@ -49,6 +49,15 @@ export default function Sidebar(props: SidebarProps) {
           </li>
         </Show>
         <li
+          class={props.activePage === "stats" ? "active" : ""}
+          onClick={() => props.onNavigate("stats")}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z" />
+          </svg>
+          <span>Statistics</span>
+        </li>
+        <li
           class={props.activePage === "settings" ? "active" : ""}
           onClick={() => props.onNavigate("settings")}
         >
@@ -59,7 +68,7 @@ export default function Sidebar(props: SidebarProps) {
         </li>
       </ul>
       <div class="sidebar-footer">
-        <span class="version">v0.3.8</span>
+        <span class="version">v0.4.0</span>
       </div>
     </nav>
   );

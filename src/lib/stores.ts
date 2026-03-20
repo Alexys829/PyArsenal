@@ -6,6 +6,8 @@ export const [installedTools, setInstalledTools] = createSignal<Record<string, I
 export const [updates, setUpdates] = createSignal<UpdateInfo[]>([]);
 export const [loading, setLoading] = createSignal(false);
 export const [activeDownloads, setActiveDownloads] = createSignal<Record<string, DownloadProgress>>({});
+export const [favorites, setFavorites] = createSignal<string[]>([]);
+export const [launchCounts, setLaunchCounts] = createSignal<Record<string, number>>({});
 
 // Toast notifications
 export interface Toast {
@@ -32,4 +34,14 @@ export function formatBytes(bytes: number): string {
   const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return (bytes / Math.pow(k, i)).toFixed(1) + " " + sizes[i];
+}
+
+export function formatDate(dateStr: string): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return dateStr;
+  }
 }

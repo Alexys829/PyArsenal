@@ -1,6 +1,6 @@
 use std::process::Command;
 
-use crate::commands::library::read_installed_db;
+use crate::commands::library::{read_installed_db, increment_launch_count};
 use crate::error::{AppError, AppResult};
 
 #[tauri::command]
@@ -12,6 +12,7 @@ pub async fn launch_tool(tool_id: String) -> AppResult<()> {
         .ok_or_else(|| AppError::ToolNotInstalled(tool_id.clone()))?;
 
     let binary = &tool.binary_path;
+    increment_launch_count(&tool_id).ok();
 
     #[cfg(unix)]
     {

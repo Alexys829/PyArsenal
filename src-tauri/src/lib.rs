@@ -17,6 +17,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_opener::init())
         .manage(github_client)
@@ -35,6 +36,13 @@ pub fn run() {
             commands::install::cancel_install,
             commands::install::uninstall_tool,
             commands::library::get_installed_tools,
+            commands::library::toggle_favorite,
+            commands::library::get_favorites,
+            commands::library::get_launch_counts,
+            commands::library::get_stats,
+            commands::library::get_tool_changelog,
+            commands::library::export_profile,
+            commands::library::import_profile,
             commands::update::check_all_updates,
             commands::launch::launch_tool,
             commands::launch::launch_tool_admin,

@@ -1,6 +1,6 @@
 import { createSignal, createMemo, For, Show } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { catalog, loading } from "../lib/stores";
+import { catalog, loading, installedTools } from "../lib/stores";
 import ToolCard from "../components/ToolCard";
 import SearchBar from "../components/SearchBar";
 
@@ -61,7 +61,11 @@ export default function StorePage(props: StorePageProps) {
     <div class="page">
       <div class="page-header">
         <h2>Store</h2>
-        <SearchBar value={search()} onInput={setSearch} />
+        <SearchBar value={search()} onInput={setSearch} placeholder="Search tools... (Ctrl+K)" />
+      </div>
+
+      <div class="library-summary">
+        {compatible().length} tools available &middot; {Object.keys(installedTools()).length} installed
       </div>
 
       <div class="category-tabs">

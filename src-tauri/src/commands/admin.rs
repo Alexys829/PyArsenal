@@ -187,6 +187,7 @@ pub async fn scan_repo(repo_url: String, github: State<'_, GitHubClient>) -> App
         asset_patterns,
         binary_name,
         install_type,
+        tags: Vec::new(),
     };
 
     Ok(RepoScanResult {
