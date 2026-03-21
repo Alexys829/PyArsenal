@@ -125,11 +125,15 @@ jobs:
           $NSIS = "src-tauri\target\release\bundle\nsis"
           $EXE_PATH = "$NSIS\PyArsenal_${VERSION}_x64-setup.exe"
           $ZIP_PATH = "$NSIS\PyArsenal_${VERSION}_x64-setup.nsis.zip"
-          # Create zip using .NET with explicit Deflate compression (Optimal = Deflate)
+          # Create zip using .NET with Stored (no compression) to ensure compatibility
           Add-Type -Assembly System.IO.Compression.FileSystem
           $zip = [System.IO.Compression.ZipFile]::Open($ZIP_PATH, 'Create')
-          [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $EXE_PATH, "PyArsenal_${VERSION}_x64-setup.exe", [System.IO.Compression.CompressionLevel]::Optimal)
+          [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $EXE_PATH, "PyArsenal_${VERSION}_x64-setup.exe", [System.IO.Compression.CompressionLevel]::NoCompression)
           $zip.Dispose()
+          # Verify the zip method
+          $verify = [System.IO.Compression.ZipFile]::OpenRead($ZIP_PATH)
+          foreach ($entry in $verify.Entries) { Write-Host "Entry: $($entry.Name), Method: $($entry.CompressionMethod), Size: $($entry.Length)" }
+          $verify.Dispose()
           Write-Host "Created zip: $ZIP_PATH"
           # Sign
           cargo install tauri-cli --version "^2"

@@ -77,7 +77,7 @@ export default function Sidebar(props: SidebarProps) {
         </li>
       </ul>
       <div class="sidebar-footer">
-        <span class="version">v0.4.1</span>
+        <span class="version">v0.4.2</span>
       </div>
     </nav>
   );
