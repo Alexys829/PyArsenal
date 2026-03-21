@@ -380,8 +380,12 @@ fn guess_binary_name(asset: &str, tool_id: &str) -> String {
 }
 
 fn guess_install_type(asset: &str) -> String {
-    if asset.ends_with(".tar.gz") || asset.ends_with(".tgz") || asset.ends_with(".zip") {
+    let lower = asset.to_lowercase();
+    if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") || lower.ends_with(".zip") {
         "archive".to_string()
+    } else if lower.contains("-setup") || lower.contains("_setup") || lower.contains("-installer") {
+        // Likely a Tauri NSIS or Inno Setup installer
+        "tauri".to_string()
     } else {
         "binary".to_string()
     }

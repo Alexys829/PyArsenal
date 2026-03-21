@@ -112,6 +112,26 @@ fn run_innosetup(installer_path: &Path, dest_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
+/// Run a Tauri NSIS installer silently, installing into dest_dir (Windows only)
+fn run_tauri_setup(installer_path: &Path, dest_dir: &Path) -> AppResult<()> {
+    // Tauri NSIS uses /S for silent, /D= must be last parameter
+    let status = std::process::Command::new(installer_path)
+        .args([
+            "/S",
+            &format!("/D={}", dest_dir.to_string_lossy()),
+        ])
+        .status()
+        .map_err(|e| AppError::Generic(format!("Failed to run Tauri setup: {}", e)))?;
+
+    if !status.success() {
+        return Err(AppError::Generic(format!(
+            "Tauri setup exited with code: {}",
+            status.code().unwrap_or(-1)
+        )));
+    }
+    Ok(())
+}
+
 /// Find the binary inside a directory, searching recursively if needed
 fn find_binary(dir: &Path, binary_name: &str) -> Option<PathBuf> {
     // Check root first
@@ -279,6 +299,30 @@ pub async fn install_tool(
             // Cleanup temp
             std::fs::remove_dir_all(&temp_dir).ok();
         }
+        "tauri" => {
+            // Tauri NSIS setup - run silently into tool_dir
+            let installer_path = temp_dir.join(asset_filename);
+            std::fs::write(&installer_path, &data)?;
+
+            if tool_dir.exists() {
+                // Run existing uninstaller first if present
+                let uninstaller = tool_dir.join("uninstall.exe");
+                if uninstaller.exists() {
+                    std::process::Command::new(&uninstaller)
+                        .arg("/S")
+                        .status()
+                        .ok();
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                }
+                std::fs::remove_dir_all(&tool_dir).ok();
+            }
+            std::fs::create_dir_all(&tool_dir)?;
+
+            run_tauri_setup(&installer_path, &tool_dir)?;
+
+            // Cleanup temp
+            std::fs::remove_dir_all(&temp_dir).ok();
+        }
         "archive" => {
             // Extract archive
             extract_archive(&data, &temp_dir, asset_filename)?;
@@ -376,16 +420,25 @@ pub async fn uninstall_tool(tool_id: String) -> AppResult<()> {
         .ok_or_else(|| AppError::ToolNotInstalled(tool_id.clone()))?;
     write_installed_db(&db)?;
 
-    // Check if it was installed via Inno Setup (has uninstaller)
     let tool_dir = tools_dir().join(&tool_id);
-    let uninstaller = tool_dir.join("unins000.exe");
-    if uninstaller.exists() {
-        // Run Inno Setup uninstaller silently
-        std::process::Command::new(&uninstaller)
+
+    // Check for Tauri NSIS uninstaller
+    let tauri_uninstaller = tool_dir.join("uninstall.exe");
+    if tauri_uninstaller.exists() {
+        std::process::Command::new(&tauri_uninstaller)
+            .arg("/S")
+            .status()
+            .ok();
+        std::thread::sleep(std::time::Duration::from_secs(3));
+    }
+
+    // Check for Inno Setup uninstaller
+    let inno_uninstaller = tool_dir.join("unins000.exe");
+    if inno_uninstaller.exists() {
+        std::process::Command::new(&inno_uninstaller)
             .args(["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"])
             .status()
             .ok();
-        // Wait a bit for uninstaller to finish, then clean up
         std::thread::sleep(std::time::Duration::from_secs(2));
     }
 

@@ -343,6 +343,7 @@ export default function AddToolPage(props: AddToolPageProps) {
               <option value="binary">Binary (single file)</option>
               <option value="archive">Archive (zip/tar.gz)</option>
               <option value="innosetup">Inno Setup installer</option>
+              <option value="tauri">Tauri NSIS setup</option>
             </select>
           </div>
         </div>
