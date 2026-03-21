@@ -112,22 +112,133 @@ fn run_innosetup(installer_path: &Path, dest_dir: &Path) -> AppResult<()> {
     Ok(())
 }
 
-/// Run a Tauri NSIS installer silently, installing into dest_dir (Windows only)
-fn run_tauri_setup(installer_path: &Path, dest_dir: &Path) -> AppResult<()> {
-    // Tauri NSIS uses /S for silent, /D= must be last parameter
-    let status = std::process::Command::new(installer_path)
-        .args([
-            "/S",
-            &format!("/D={}", dest_dir.to_string_lossy()),
-        ])
-        .status()
-        .map_err(|e| AppError::Generic(format!("Failed to run Tauri setup: {}", e)))?;
+/// Extract a Tauri NSIS setup exe using 7z (no installation, no UAC, no registry)
+fn extract_nsis_setup(installer_path: &Path, dest_dir: &Path) -> AppResult<()> {
+    // Try common 7z locations
+    let seven_zip_candidates = [
+        "7z".to_string(),
+        r"C:\Program Files\7-Zip\7z.exe".to_string(),
+        r"C:\Program Files (x86)\7-Zip\7z.exe".to_string(),
+    ];
 
-    if !status.success() {
-        return Err(AppError::Generic(format!(
-            "Tauri setup exited with code: {}",
-            status.code().unwrap_or(-1)
-        )));
+    let mut seven_zip: Option<String> = None;
+    for candidate in &seven_zip_candidates {
+        let check = std::process::Command::new(candidate)
+            .arg("--help")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        if check.is_ok() {
+            seven_zip = Some(candidate.clone());
+            break;
+        }
+    }
+
+    if let Some(sz) = seven_zip {
+        // Extract NSIS exe with 7z
+        let status = std::process::Command::new(&sz)
+            .args([
+                "x",
+                &installer_path.to_string_lossy(),
+                &format!("-o{}", dest_dir.to_string_lossy()),
+                "-y",
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map_err(|e| AppError::Generic(format!("Failed to run 7z: {}", e)))?;
+
+        if !status.success() {
+            return Err(AppError::Extraction("7z extraction failed".to_string()));
+        }
+
+        // NSIS extracts into $PLUGINSDIR, $TEMP, etc. — find the app files
+        // Tauri puts the main exe and resources at the root or in a subfolder
+        cleanup_nsis_extracted(dest_dir)?;
+
+        Ok(())
+    } else {
+        // Fallback: run setup silently if 7z is not available
+        let status = std::process::Command::new(installer_path)
+            .arg("/S")
+            .status()
+            .map_err(|e| AppError::Generic(format!("Failed to run setup: {}", e)))?;
+
+        if !status.success() {
+            return Err(AppError::Generic(format!(
+                "Setup exited with code: {}",
+                status.code().unwrap_or(-1)
+            )));
+        }
+
+        // Wait for installer, then find and move files
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        // Find the installed directory
+        let local_app_data = dirs::data_local_dir().unwrap_or_default();
+        // Search for recently created directories
+        if let Ok(entries) = std::fs::read_dir(&local_app_data) {
+            for entry in entries.flatten() {
+                if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    let uninstaller = entry.path().join("uninstall.exe");
+                    if uninstaller.exists() {
+                        // Check if this was just created (within last 30 seconds)
+                        if let Ok(meta) = uninstaller.metadata() {
+                            if let Ok(modified) = meta.modified() {
+                                if modified.elapsed().unwrap_or_default().as_secs() < 30 {
+                                    copy_dir_recursive(&entry.path(), dest_dir)?;
+                                    // Run uninstaller to clean up the original
+                                    std::process::Command::new(&uninstaller)
+                                        .arg("/S")
+                                        .status()
+                                        .ok();
+                                    std::thread::sleep(std::time::Duration::from_secs(2));
+                                    return Ok(());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(AppError::Generic("Could not find installed files. Install 7-Zip for better extraction.".to_string()))
+    }
+}
+
+/// Clean up NSIS extracted directory — remove installer junk, keep app files
+fn cleanup_nsis_extracted(dir: &Path) -> AppResult<()> {
+    // Remove NSIS internal directories
+    let junk_dirs = ["$PLUGINSDIR", "$TEMP", "$_OUTDIR", "$R0"];
+    for junk in &junk_dirs {
+        let path = dir.join(junk);
+        if path.exists() {
+            std::fs::remove_dir_all(&path).ok();
+        }
+    }
+    // Remove NSIS internal files
+    let junk_files = ["Uninstall.nsi", "uninstall.exe.nsis"];
+    for junk in &junk_files {
+        let path = dir.join(junk);
+        if path.exists() {
+            std::fs::remove_file(&path).ok();
+        }
+    }
+    Ok(())
+}
+
+/// Recursively copy a directory
+fn copy_dir_recursive(src: &Path, dst: &Path) -> AppResult<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
     }
     Ok(())
 }
@@ -300,25 +411,16 @@ pub async fn install_tool(
             std::fs::remove_dir_all(&temp_dir).ok();
         }
         "tauri" => {
-            // Tauri NSIS setup - run silently into tool_dir
+            // Tauri NSIS setup — extract files directly without running installer
             let installer_path = temp_dir.join(asset_filename);
             std::fs::write(&installer_path, &data)?;
 
             if tool_dir.exists() {
-                // Run existing uninstaller first if present
-                let uninstaller = tool_dir.join("uninstall.exe");
-                if uninstaller.exists() {
-                    std::process::Command::new(&uninstaller)
-                        .arg("/S")
-                        .status()
-                        .ok();
-                    std::thread::sleep(std::time::Duration::from_secs(3));
-                }
-                std::fs::remove_dir_all(&tool_dir).ok();
+                std::fs::remove_dir_all(&tool_dir)?;
             }
             std::fs::create_dir_all(&tool_dir)?;
 
-            run_tauri_setup(&installer_path, &tool_dir)?;
+            extract_nsis_setup(&installer_path, &tool_dir)?;
 
             // Cleanup temp
             std::fs::remove_dir_all(&temp_dir).ok();
@@ -421,16 +523,6 @@ pub async fn uninstall_tool(tool_id: String) -> AppResult<()> {
     write_installed_db(&db)?;
 
     let tool_dir = tools_dir().join(&tool_id);
-
-    // Check for Tauri NSIS uninstaller
-    let tauri_uninstaller = tool_dir.join("uninstall.exe");
-    if tauri_uninstaller.exists() {
-        std::process::Command::new(&tauri_uninstaller)
-            .arg("/S")
-            .status()
-            .ok();
-        std::thread::sleep(std::time::Duration::from_secs(3));
-    }
 
     // Check for Inno Setup uninstaller
     let inno_uninstaller = tool_dir.join("unins000.exe");
