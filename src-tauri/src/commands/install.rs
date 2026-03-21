@@ -245,12 +245,13 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> AppResult<()> {
 
 /// Find the binary inside a directory, searching recursively if needed
 fn find_binary(dir: &Path, binary_name: &str) -> Option<PathBuf> {
-    // Check root first
+    // Check exact match at root
     let root_path = dir.join(binary_name);
     if root_path.exists() {
         return Some(root_path);
     }
-    // Search one level deep (common for zip archives)
+
+    // Search one level deep for exact match
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
@@ -261,6 +262,27 @@ fn find_binary(dir: &Path, binary_name: &str) -> Option<PathBuf> {
             }
         }
     }
+
+    // Fallback: find any .exe at root that's not an uninstaller/helper
+    let ext = if binary_name.ends_with(".exe") { ".exe" }
+        else if binary_name.ends_with(".AppImage") { ".AppImage" }
+        else { "" };
+
+    if !ext.is_empty() {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+                if name.ends_with(ext)
+                    && !name.contains("uninstall")
+                    && !name.contains("webview")
+                    && !name.starts_with("$")
+                {
+                    return Some(entry.path());
+                }
+            }
+        }
+    }
+
     None
 }
 
