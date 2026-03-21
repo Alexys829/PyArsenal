@@ -1,13 +1,20 @@
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, USER_AGENT};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::error::{AppError, AppResult};
 use crate::models::GitHubRelease;
 
+struct ETagEntry {
+    etag: String,
+    data: GitHubRelease,
+}
+
 pub struct GitHubClient {
     client: reqwest::Client,
     pat: Arc<RwLock<Option<String>>>,
+    etag_cache: Arc<RwLock<HashMap<String, ETagEntry>>>,
 }
 
 impl GitHubClient {
@@ -18,6 +25,7 @@ impl GitHubClient {
         Self {
             client,
             pat: Arc::new(RwLock::new(None)),
+            etag_cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -42,15 +50,36 @@ impl GitHubClient {
 
     pub async fn get_latest_release(&self, repo: &str) -> AppResult<GitHubRelease> {
         let url = format!("https://api.github.com/repos/{}/releases/latest", repo);
+        let mut req_headers = self.headers().await;
+
+        // Add ETag if we have a cached response
+        let cached_etag = {
+            let cache = self.etag_cache.read().await;
+            cache.get(repo).map(|e| e.etag.clone())
+        };
+        if let Some(ref etag) = cached_etag {
+            if let Ok(val) = HeaderValue::from_str(&format!("\"{}\"", etag)) {
+                req_headers.insert("If-None-Match", val);
+            }
+        }
+
         let resp = self
             .client
             .get(&url)
-            .headers(self.headers().await)
+            .headers(req_headers)
             .send()
             .await
             .map_err(|_| AppError::RepoUnreachable {
                 repo: repo.to_string(),
             })?;
+
+        // 304 Not Modified — return cached data (doesn't count against rate limit)
+        if resp.status() == reqwest::StatusCode::NOT_MODIFIED {
+            let cache = self.etag_cache.read().await;
+            if let Some(entry) = cache.get(repo) {
+                return Ok(entry.data.clone());
+            }
+        }
 
         if resp.status() == reqwest::StatusCode::FORBIDDEN
             || resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
@@ -78,7 +107,27 @@ impl GitHubClient {
             });
         }
 
+        // Save ETag from response
+        let new_etag = resp
+            .headers()
+            .get("etag")
+            .and_then(|v| v.to_str().ok())
+            .map(|s| s.trim_matches('"').to_string());
+
         let release: GitHubRelease = resp.json().await?;
+
+        // Cache the response with ETag
+        if let Some(etag) = new_etag {
+            let mut cache = self.etag_cache.write().await;
+            cache.insert(
+                repo.to_string(),
+                ETagEntry {
+                    etag,
+                    data: release.clone(),
+                },
+            );
+        }
+
         Ok(release)
     }
 
