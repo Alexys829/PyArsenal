@@ -31,3 +31,7 @@ pub fn icons_dir() -> PathBuf {
 pub fn theme_config_path() -> PathBuf {
     data_dir().join("theme.json")
 }
+
+pub fn prefs_path() -> PathBuf {
+    data_dir().join("prefs.json")
+}

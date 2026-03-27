@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile, ThemeConfig } from "./types";
+import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile, ThemeConfig, LinkEntry, LinkValidation } from "./types";
 
 export const fetchCatalog = () =>
   invoke<CatalogEntry[]>("fetch_catalog");
@@ -97,6 +97,13 @@ export const getAutostart = () =>
 export const setAutostart = (enabled: boolean) =>
   invoke<void>("set_autostart", { enabled });
 
+// Preferences
+export const getPrefs = () =>
+  invoke<{ download_dir: string }>("get_prefs");
+
+export const savePrefs = (prefs: { download_dir: string }) =>
+  invoke<void>("save_prefs", { prefs });
+
 // Desktop integration
 export const getPlatform = () =>
   invoke<string>("get_platform");
@@ -121,6 +128,40 @@ export const removeToolShortcut = (toolId: string, toolName: string) =>
 
 export const toolShortcutExists = (toolId: string, toolName: string) =>
   invoke<boolean>("tool_shortcut_exists", { toolId, toolName });
+
+// Links
+export const validateLink = (url: string) =>
+  invoke<LinkValidation>("validate_link", { url });
+
+export const downloadLink = (linkId: string, url: string, filename: string, destDir: string) =>
+  invoke<string>("download_link", { linkId, url, filename, destDir });
+
+export const getLinkIcon = (linkId: string) =>
+  invoke<string>("get_link_icon", { linkId });
+
+export const uploadLinkIcon = (linkId: string, iconBase64: string) =>
+  invoke<void>("upload_link_icon", { linkId, iconBase64 });
+
+export const openFile = (path: string) =>
+  invoke<void>("open_file", { path });
+
+export const openFileFolder = (path: string) =>
+  invoke<void>("open_file_folder", { path });
+
+export const getDefaultDownloadDir = () =>
+  invoke<string>("get_default_download_dir");
+
+export const getCatalogLinks = () =>
+  invoke<LinkEntry[]>("get_catalog_links");
+
+export const addLinkToCatalog = (entry: LinkEntry) =>
+  invoke<void>("add_link_to_catalog", { entry });
+
+export const updateLinkInCatalog = (entry: LinkEntry) =>
+  invoke<void>("update_link_in_catalog", { entry });
+
+export const removeLinkFromCatalog = (linkId: string) =>
+  invoke<void>("remove_link_from_catalog", { linkId });
 
 // Theme
 export const getThemeConfig = () =>

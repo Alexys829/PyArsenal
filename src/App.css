@@ -441,6 +441,16 @@ body {
   color: var(--text-muted);
 }
 
+.link-filename {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
 .release-notes-preview {
   background: rgba(232, 164, 39, 0.08);
   border-radius: 6px;

@@ -9,6 +9,24 @@ pub struct Catalog {
     pub schema_version: u32,
     pub updated_at: String,
     pub tools: Vec<CatalogEntry>,
+    #[serde(default)]
+    pub links: Vec<LinkEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkEntry {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub url: String,
+    pub icon: String,
+    pub filename: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub added_by: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

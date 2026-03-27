@@ -73,6 +73,26 @@ export interface ExportProfile {
   favorites: string[];
 }
 
+export interface LinkEntry {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  icon: string;
+  filename: string;
+  category: string;
+  tags: string[];
+  added_by: string;
+}
+
+export interface LinkValidation {
+  valid: boolean;
+  final_url: string;
+  filename: string;
+  content_type: string;
+  size: number;
+}
+
 export interface CustomTheme {
   id: string;
   name: string;

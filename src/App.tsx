@@ -23,6 +23,7 @@ import LibraryPage from "./pages/LibraryPage";
 import SettingsPage from "./pages/SettingsPage";
 import AddToolPage from "./pages/AddToolPage";
 import StatsPage from "./pages/StatsPage";
+import DownloadsPage from "./pages/DownloadsPage";
 import ThemesPage from "./pages/ThemesPage";
 import { applyTheme, getPresetById } from "./lib/themes";
 import "./App.css";
@@ -186,6 +187,9 @@ function App() {
         </Show>
         <Show when={page() === "library"}>
           <LibraryPage onRefresh={loadData} />
+        </Show>
+        <Show when={page() === "downloads"}>
+          <DownloadsPage />
         </Show>
         <Show when={page() === "addtool"}>
           <AddToolPage onRefresh={() => loadData(true)} />

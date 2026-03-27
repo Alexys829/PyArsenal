@@ -3,7 +3,7 @@ use tauri::State;
 
 use crate::error::{AppError, AppResult};
 use crate::github::GitHubClient;
-use crate::models::{Catalog, CatalogEntry, GitHubRelease};
+use crate::models::{Catalog, CatalogEntry, GitHubRelease, LinkEntry};
 
 use serde::{Deserialize, Serialize};
 
@@ -261,6 +261,52 @@ pub async fn update_in_catalog(entry: CatalogEntry, github: State<'_, GitHubClie
 pub async fn get_catalog_entries(github: State<'_, GitHubClient>) -> AppResult<Vec<CatalogEntry>> {
     let cf = fetch_catalog_file(&github).await?;
     Ok(cf.catalog.tools)
+}
+
+// ── Link management ──
+
+#[tauri::command]
+pub async fn get_catalog_links(github: State<'_, GitHubClient>) -> AppResult<Vec<LinkEntry>> {
+    let cf = fetch_catalog_file(&github).await?;
+    Ok(cf.catalog.links)
+}
+
+#[tauri::command]
+pub async fn add_link_to_catalog(entry: LinkEntry, github: State<'_, GitHubClient>) -> AppResult<()> {
+    let mut cf = fetch_catalog_file(&github).await?;
+    if cf.catalog.links.iter().any(|l| l.id == entry.id) {
+        return Err(AppError::Generic(format!("Link '{}' already exists", entry.id)));
+    }
+    let msg = format!("Add link: {}", entry.name);
+    cf.catalog.links.push(entry);
+    cf.catalog.updated_at = chrono::Utc::now().to_rfc3339();
+    push_catalog_file(&cf.catalog, &cf.sha, &msg, &github).await
+}
+
+#[tauri::command]
+pub async fn update_link_in_catalog(entry: LinkEntry, github: State<'_, GitHubClient>) -> AppResult<()> {
+    let mut cf = fetch_catalog_file(&github).await?;
+    let found = cf.catalog.links.iter_mut().find(|l| l.id == entry.id);
+    match found {
+        Some(existing) => *existing = entry.clone(),
+        None => return Err(AppError::Generic(format!("Link '{}' not found", entry.id))),
+    }
+    cf.catalog.updated_at = chrono::Utc::now().to_rfc3339();
+    let msg = format!("Update link: {}", entry.name);
+    push_catalog_file(&cf.catalog, &cf.sha, &msg, &github).await
+}
+
+#[tauri::command]
+pub async fn remove_link_from_catalog(link_id: String, github: State<'_, GitHubClient>) -> AppResult<()> {
+    let mut cf = fetch_catalog_file(&github).await?;
+    let before = cf.catalog.links.len();
+    cf.catalog.links.retain(|l| l.id != link_id);
+    if cf.catalog.links.len() == before {
+        return Err(AppError::Generic(format!("Link '{}' not found", link_id)));
+    }
+    cf.catalog.updated_at = chrono::Utc::now().to_rfc3339();
+    let msg = format!("Remove link: {}", link_id);
+    push_catalog_file(&cf.catalog, &cf.sha, &msg, &github).await
 }
 
 /// Check if the current user has write access to the catalog repo

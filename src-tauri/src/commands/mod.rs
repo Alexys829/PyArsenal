@@ -4,5 +4,6 @@ pub mod desktop;
 pub mod install;
 pub mod launch;
 pub mod library;
+pub mod links;
 pub mod settings;
 pub mod update;

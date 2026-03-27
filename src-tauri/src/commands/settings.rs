@@ -6,7 +6,7 @@ use tauri_plugin_autostart::AutoLaunchManager;
 
 use crate::error::{AppError, AppResult};
 use crate::github::GitHubClient;
-use crate::paths::theme_config_path;
+use crate::paths::{theme_config_path, prefs_path};
 
 const SERVICE: &str = "pyarsenal";
 const ACCOUNT: &str = "github_pat";
@@ -111,6 +111,33 @@ pub async fn get_theme_config() -> AppResult<ThemeConfig> {
 pub async fn save_theme_config(config: ThemeConfig) -> AppResult<()> {
     let path = theme_config_path();
     let json = serde_json::to_string_pretty(&config)?;
+    std::fs::write(&path, json)?;
+    Ok(())
+}
+
+// ── Preferences (download path, etc.) ──
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AppPrefs {
+    #[serde(default)]
+    pub download_dir: String,
+}
+
+#[tauri::command]
+pub async fn get_prefs() -> AppResult<AppPrefs> {
+    let path = prefs_path();
+    if !path.exists() {
+        return Ok(AppPrefs::default());
+    }
+    let data = std::fs::read_to_string(&path)?;
+    let prefs: AppPrefs = serde_json::from_str(&data)?;
+    Ok(prefs)
+}
+
+#[tauri::command]
+pub async fn save_prefs(prefs: AppPrefs) -> AppResult<()> {
+    let path = prefs_path();
+    let json = serde_json::to_string_pretty(&prefs)?;
     std::fs::write(&path, json)?;
     Ok(())
 }

@@ -1,7 +1,7 @@
 import { createSignal, Show, For, onMount } from "solid-js";
-import { scanRepo, addToCatalog, removeFromCatalog, updateInCatalog, getCatalogEntries } from "../lib/api";
+import { scanRepo, addToCatalog, removeFromCatalog, updateInCatalog, getCatalogEntries, getCatalogLinks, addLinkToCatalog, updateLinkInCatalog, removeLinkFromCatalog, validateLink, uploadLinkIcon } from "../lib/api";
 import { showToast } from "../lib/stores";
-import type { RepoScanResult, CatalogEntry } from "../lib/types";
+import type { RepoScanResult, CatalogEntry, LinkEntry } from "../lib/types";
 
 interface AddToolPageProps {
   onRefresh: () => void;
@@ -35,7 +35,23 @@ export default function AddToolPage(props: AddToolPageProps) {
   const [toolTags, setToolTags] = createSignal("");
   const [tagInput, setTagInput] = createSignal("");
 
-  onMount(() => loadCatalog());
+  // Links management
+  const [catalogLinks, setCatalogLinks] = createSignal<LinkEntry[]>([]);
+  const [linkUrl, setLinkUrl] = createSignal("");
+  const [linkValidating, setLinkValidating] = createSignal(false);
+  const [linkName, setLinkName] = createSignal("");
+  const [linkDesc, setLinkDesc] = createSignal("");
+  const [linkFilename, setLinkFilename] = createSignal("");
+  const [linkCategory, setLinkCategory] = createSignal("Documents");
+  const [linkTags, setLinkTags] = createSignal("");
+  const [linkTagInput, setLinkTagInput] = createSignal("");
+  const [linkValidated, setLinkValidated] = createSignal(false);
+  const [linkFinalUrl, setLinkFinalUrl] = createSignal("");
+  const [linkIconBase64, setLinkIconBase64] = createSignal("");
+  const [editingLink, setEditingLink] = createSignal<LinkEntry | null>(null);
+  const [linkAdding, setLinkAdding] = createSignal(false);
+
+  onMount(() => { loadCatalog(); loadLinks(); });
 
   async function loadCatalog() {
     setLoadingCatalog(true);
@@ -46,6 +62,151 @@ export default function AddToolPage(props: AddToolPageProps) {
       // Silent — might not have PAT
     } finally {
       setLoadingCatalog(false);
+    }
+  }
+
+  async function loadLinks() {
+    try {
+      const entries = await getCatalogLinks();
+      setCatalogLinks(entries);
+    } catch { /* ignore */ }
+  }
+
+  async function handleValidateLink() {
+    const url = linkUrl().trim();
+    if (!url) return;
+    setLinkValidating(true);
+    setLinkValidated(false);
+    try {
+      const result = await validateLink(url);
+      if (result.valid) {
+        setLinkFinalUrl(result.final_url);
+        setLinkFilename(result.filename || "download");
+        setLinkValidated(true);
+        showToast("success", "Link is valid and reachable.");
+      } else {
+        showToast("error", "Link is not reachable or invalid.");
+      }
+    } catch (e) {
+      showToast("error", `Validation failed: ${e}`);
+    } finally {
+      setLinkValidating(false);
+    }
+  }
+
+  function handleIconUpload() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".png";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Extract base64 part (remove data:image/png;base64, prefix)
+        const b64 = result.split(",")[1];
+        if (b64) setLinkIconBase64(b64);
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  }
+
+  function resetLinkForm() {
+    setLinkUrl(""); setLinkName(""); setLinkDesc(""); setLinkFilename("");
+    setLinkCategory("Documents"); setLinkTags(""); setLinkTagInput("");
+    setLinkValidated(false); setLinkFinalUrl(""); setLinkIconBase64("");
+    setEditingLink(null);
+  }
+
+  async function handleAddLink() {
+    const id = linkName().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    if (!id || !linkName() || !linkFinalUrl()) return;
+
+    setLinkAdding(true);
+    try {
+      const entry: LinkEntry = {
+        id,
+        name: linkName(),
+        description: linkDesc(),
+        url: linkFinalUrl(),
+        icon: `${id}.png`,
+        filename: linkFilename(),
+        category: linkCategory(),
+        tags: linkTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0),
+        added_by: "",
+      };
+      await addLinkToCatalog(entry);
+      // Upload icon if provided
+      if (linkIconBase64()) {
+        await uploadLinkIcon(id, linkIconBase64());
+      }
+      showToast("success", `Link "${linkName()}" added!`);
+      resetLinkForm();
+      props.onRefresh();
+      loadLinks();
+    } catch (e) {
+      showToast("error", `Failed to add link: ${e}`);
+    } finally {
+      setLinkAdding(false);
+    }
+  }
+
+  async function handleUpdateLink() {
+    const editing = editingLink();
+    if (!editing) return;
+    setLinkAdding(true);
+    try {
+      const entry: LinkEntry = {
+        id: editing.id,
+        name: linkName(),
+        description: linkDesc(),
+        url: linkFinalUrl() || editing.url,
+        icon: editing.icon,
+        filename: linkFilename(),
+        category: linkCategory(),
+        tags: linkTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0),
+        added_by: editing.added_by,
+      };
+      await updateLinkInCatalog(entry);
+      if (linkIconBase64()) {
+        await uploadLinkIcon(editing.id, linkIconBase64());
+      }
+      showToast("success", `Link "${linkName()}" updated!`);
+      resetLinkForm();
+      props.onRefresh();
+      loadLinks();
+    } catch (e) {
+      showToast("error", `Failed to update: ${e}`);
+    } finally {
+      setLinkAdding(false);
+    }
+  }
+
+  function handleEditLink(link: LinkEntry) {
+    setEditingLink(link);
+    setLinkUrl(link.url);
+    setLinkName(link.name);
+    setLinkDesc(link.description);
+    setLinkFilename(link.filename);
+    setLinkCategory(link.category);
+    setLinkTags((link.tags || []).join(", "));
+    setLinkFinalUrl(link.url);
+    setLinkValidated(true);
+  }
+
+  async function handleRemoveLink(link: LinkEntry) {
+    setLinkAdding(true);
+    try {
+      await removeLinkFromCatalog(link.id);
+      showToast("success", `Link "${link.name}" removed.`);
+      loadLinks();
+      props.onRefresh();
+    } catch (e) {
+      showToast("error", `Failed to remove: ${e}`);
+    } finally {
+      setLinkAdding(false);
     }
   }
 
@@ -409,6 +570,133 @@ export default function AddToolPage(props: AddToolPageProps) {
           </div>
         </div>
       </Show>
+
+      {/* ── Links Management ── */}
+      <div class="settings-section" style={{ "margin-top": "32px" }}>
+        <h3>Download Links</h3>
+        <Show when={catalogLinks().length > 0}>
+          <div class="catalog-list" style={{ "margin-bottom": "16px" }}>
+            <For each={catalogLinks()}>
+              {(link) => (
+                <div class="catalog-item">
+                  <div class="catalog-item-info">
+                    <strong>{link.name}</strong>
+                    <span class="catalog-item-meta">{link.filename} &middot; {link.category}</span>
+                  </div>
+                  <div class="catalog-item-actions">
+                    <button class="btn btn-small" onClick={() => handleEditLink(link)}>Edit</button>
+                    <button class="btn btn-small btn-danger-small" onClick={() => handleRemoveLink(link)} disabled={linkAdding()}>Remove</button>
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+
+      {/* Add/Edit Link */}
+      <div class="settings-section">
+        <h3>{editingLink() ? `Edit: ${editingLink()!.name}` : "Add New Link"}</h3>
+        <p class="settings-hint">
+          Paste a Google Drive share link or any direct download URL.
+        </p>
+        <div class="pat-input-row">
+          <input
+            type="text"
+            value={linkUrl()}
+            onInput={(e) => setLinkUrl(e.currentTarget.value)}
+            placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
+            class="pat-input"
+            onKeyDown={(e) => e.key === "Enter" && handleValidateLink()}
+          />
+          <button
+            class="btn btn-install"
+            disabled={linkValidating() || !linkUrl().trim()}
+            onClick={handleValidateLink}
+          >
+            {linkValidating() ? "Checking..." : "Validate"}
+          </button>
+        </div>
+
+        <Show when={linkValidated()}>
+          <div class="form-grid" style={{ "margin-top": "12px" }}>
+            <label>Name</label>
+            <input type="text" value={linkName()} onInput={(e) => setLinkName(e.currentTarget.value)} class="form-input" placeholder="Resource name" />
+
+            <label>Description</label>
+            <textarea value={linkDesc()} onInput={(e) => setLinkDesc(e.currentTarget.value)} class="form-input form-textarea" placeholder="Brief description" />
+
+            <label>Filename</label>
+            <input type="text" value={linkFilename()} onInput={(e) => setLinkFilename(e.currentTarget.value)} class="form-input" />
+
+            <label>Category</label>
+            <select value={linkCategory()} onChange={(e) => setLinkCategory(e.currentTarget.value)} class="form-input">
+              <option value="Documents">Documents</option>
+              <option value="Media">Media</option>
+              <option value="Templates">Templates</option>
+              <option value="Resources">Resources</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <label>Tags</label>
+            <div class="tags-input-wrapper">
+              <div class="tags-list">
+                <For each={linkTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0)}>
+                  {(tag) => (
+                    <span class="tag-chip">
+                      {tag}
+                      <button class="tag-remove" onClick={() => {
+                        const tags = linkTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0 && t !== tag);
+                        setLinkTags(tags.join(", "));
+                      }}>&times;</button>
+                    </span>
+                  )}
+                </For>
+              </div>
+              <input
+                type="text"
+                value={linkTagInput()}
+                onInput={(e) => setLinkTagInput(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    const val = linkTagInput().trim();
+                    if (val) {
+                      const current = linkTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0);
+                      if (!current.includes(val)) setLinkTags([...current, val].join(", "));
+                      setLinkTagInput("");
+                    }
+                  }
+                }}
+                class="form-input"
+                placeholder="Type a tag and press Enter"
+              />
+            </div>
+
+            <label>Icon (PNG)</label>
+            <div>
+              <button class="btn btn-small" onClick={handleIconUpload}>
+                {linkIconBase64() ? "Icon selected" : "Choose icon..."}
+              </button>
+              {linkIconBase64() && <span style={{ "margin-left": "8px", "font-size": "12px", color: "var(--success)" }}>Ready to upload</span>}
+            </div>
+          </div>
+
+          <div class="pat-actions" style={{ "margin-top": "12px" }}>
+            <Show when={editingLink()}>
+              <button class="btn btn-install btn-large" disabled={linkAdding() || !linkName()} onClick={handleUpdateLink}>
+                {linkAdding() ? "Saving..." : "Save Link"}
+              </button>
+              <button class="btn btn-small" onClick={resetLinkForm}>Cancel</button>
+            </Show>
+            <Show when={!editingLink()}>
+              <button class="btn btn-install btn-large" disabled={linkAdding() || !linkName() || !linkFilename()} onClick={handleAddLink}>
+                {linkAdding() ? "Adding..." : "Add Link"}
+              </button>
+            </Show>
+          </div>
+        </Show>
+      </div>
     </div>
   );
 }

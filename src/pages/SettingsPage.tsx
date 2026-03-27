@@ -12,6 +12,9 @@ import {
   removeFromAppMenu,
   getAutostart,
   setAutostart,
+  getPrefs,
+  savePrefs,
+  getDefaultDownloadDir,
 } from "../lib/api";
 import { showToast } from "../lib/stores";
 
@@ -33,6 +36,9 @@ export default function SettingsPage() {
   const [autostartEnabled, setAutostartEnabled] = createSignal(false);
   const [autostartBusy, setAutostartBusy] = createSignal(false);
 
+  // Download path
+  const [dlPath, setDlPath] = createSignal("");
+
   onMount(async () => {
     // Load PAT
     try {
@@ -53,6 +59,17 @@ export default function SettingsPage() {
     } catch {
       // ignore
     }
+
+    // Download path
+    try {
+      const prefs = await getPrefs();
+      if (prefs.download_dir) {
+        setDlPath(prefs.download_dir);
+      } else {
+        const def = await getDefaultDownloadDir();
+        setDlPath(def);
+      }
+    } catch { /* ignore */ }
 
     // Desktop integration - only show on Linux
     try {
@@ -311,6 +328,36 @@ export default function SettingsPage() {
         <button class="btn btn-small" onClick={refreshRateLimit}>
           Refresh
         </button>
+      </div>
+
+      <div class="settings-section">
+        <h3>Downloads</h3>
+        <p class="settings-hint">
+          Default folder for downloaded files from the Downloads section.
+        </p>
+        <div class="pat-input-row">
+          <input
+            type="text"
+            value={dlPath()}
+            onInput={(e) => setDlPath(e.currentTarget.value)}
+            class="pat-input"
+            style={{ "font-size": "13px" }}
+            placeholder="/home/user/Desktop"
+          />
+          <button
+            class="btn btn-small"
+            onClick={async () => {
+              try {
+                await savePrefs({ download_dir: dlPath() });
+                showToast("success", "Download path saved.");
+              } catch (e) {
+                showToast("error", `${e}`);
+              }
+            }}
+          >
+            Save
+          </button>
+        </div>
       </div>
 
       <div class="settings-section">
