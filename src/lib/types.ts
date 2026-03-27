@@ -91,6 +91,7 @@ export interface LinkValidation {
   filename: string;
   content_type: string;
   size: number;
+  service: string;
 }
 
 export interface CustomTheme {

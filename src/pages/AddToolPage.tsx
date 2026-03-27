@@ -83,7 +83,7 @@ export default function AddToolPage(props: AddToolPageProps) {
         setLinkFinalUrl(result.final_url);
         setLinkFilename(result.filename || "download");
         setLinkValidated(true);
-        showToast("success", "Link is valid and reachable.");
+        showToast("success", `Link valid (${result.service}).`);
       } else {
         showToast("error", "Link is not reachable or invalid.");
       }

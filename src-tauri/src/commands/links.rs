@@ -17,10 +17,12 @@ pub struct LinkValidation {
     pub filename: String,
     pub content_type: String,
     pub size: u64,
+    pub service: String,
 }
 
-/// Convert Google Drive share links to direct download URLs
-fn convert_gdrive_url(url: &str) -> String {
+/// Convert cloud drive share links to direct download URLs
+fn convert_to_direct_url(url: &str) -> String {
+    // ── Google Drive ──
     // https://drive.google.com/file/d/FILE_ID/view?usp=sharing
     if url.contains("drive.google.com/file/d/") {
         if let Some(id_start) = url.find("/d/") {
@@ -39,14 +41,172 @@ fn convert_gdrive_url(url: &str) -> String {
             return format!("https://drive.google.com/uc?export=download&id={}", file_id);
         }
     }
-    // Already a direct link or other URL
+
+    // ── Dropbox ──
+    // https://www.dropbox.com/s/xxx/file.ext?dl=0 → ?dl=1
+    // https://www.dropbox.com/scl/fi/xxx/file.ext?rlkey=...&dl=0
+    if url.contains("dropbox.com/") {
+        let mut direct = url.to_string();
+        if direct.contains("dl=0") {
+            direct = direct.replace("dl=0", "dl=1");
+        } else if !direct.contains("dl=1") {
+            if direct.contains('?') {
+                direct.push_str("&dl=1");
+            } else {
+                direct.push_str("?dl=1");
+            }
+        }
+        return direct;
+    }
+
+    // ── OneDrive ──
+    // https://1drv.ms/xxx or https://onedrive.live.com/...
+    // Add ?download=1 parameter
+    if url.contains("1drv.ms/") || url.contains("onedrive.live.com/") || url.contains("sharepoint.com/") {
+        let mut direct = url.to_string();
+        if !direct.contains("download=1") {
+            if direct.contains('?') {
+                direct.push_str("&download=1");
+            } else {
+                direct.push_str("?download=1");
+            }
+        }
+        return direct;
+    }
+
+    // Already a direct link or unsupported service
     url.to_string()
 }
 
-/// Validate a link by making a HEAD request
+/// Detect the cloud service from a URL
+fn detect_cloud_service(url: &str) -> &'static str {
+    if url.contains("drive.google.com") { "Google Drive" }
+    else if url.contains("dropbox.com") { "Dropbox" }
+    else if url.contains("1drv.ms") || url.contains("onedrive.live.com") || url.contains("sharepoint.com") { "OneDrive" }
+    else if url.contains("mediafire.com") { "MediaFire" }
+    else if url.contains("mega.nz") || url.contains("mega.co.nz") { "MEGA" }
+    else { "Direct" }
+}
+
+/// Extract direct download link from MediaFire page
+async fn resolve_mediafire(url: &str) -> Option<String> {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .ok()?;
+    let resp = client.get(url).header("User-Agent", "Mozilla/5.0").send().await.ok()?;
+    let html = resp.text().await.ok()?;
+
+    // MediaFire has a download link with id="downloadButton" or class="download_link"
+    // The href contains the direct download URL
+    if let Some(pos) = html.find("id=\"downloadButton\"") {
+        let search_area = &html[pos.saturating_sub(500)..pos + 500.min(html.len() - pos)];
+        if let Some(href_pos) = search_area.find("href=\"") {
+            let url_start = href_pos + 6;
+            if let Some(url_end) = search_area[url_start..].find('"') {
+                let dl_url = &search_area[url_start..url_start + url_end];
+                if dl_url.starts_with("http") {
+                    return Some(dl_url.to_string());
+                }
+            }
+        }
+    }
+    // Fallback: look for aria-label="Download file"
+    if let Some(pos) = html.find("aria-label=\"Download file\"") {
+        let search_area = &html[pos.saturating_sub(500)..pos + 200.min(html.len() - pos)];
+        if let Some(href_pos) = search_area.find("href=\"") {
+            let url_start = href_pos + 6;
+            if let Some(url_end) = search_area[url_start..].find('"') {
+                let dl_url = &search_area[url_start..url_start + url_end];
+                if dl_url.starts_with("http") {
+                    return Some(dl_url.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Download from MEGA using megatools CLI (megadl)
+async fn download_mega(url: &str, dest_dir: &str) -> AppResult<String> {
+    // Check if megadl is available
+    let check = std::process::Command::new("megadl")
+        .arg("--help")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    if check.is_err() || !check.unwrap().success() {
+        return Err(AppError::Generic(
+            "MEGA downloads require 'megatools'. Install it:\n\
+             Linux: sudo apt install megatools\n\
+             Windows: download from https://megatools.megous.com".to_string()
+        ));
+    }
+
+    let output = std::process::Command::new("megadl")
+        .args(["--path", dest_dir, url])
+        .output()
+        .map_err(|e| AppError::Generic(format!("Failed to run megadl: {}", e)))?;
+
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::Generic(format!("MEGA download failed: {}", err)));
+    }
+
+    // megadl prints the downloaded filename
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let filename = stdout.lines().last().unwrap_or("download").trim();
+
+    Ok(std::path::Path::new(dest_dir).join(filename).to_string_lossy().to_string())
+}
+
+/// Validate a link by checking reachability
 #[tauri::command]
 pub async fn validate_link(url: String, _github: State<'_, GitHubClient>) -> AppResult<LinkValidation> {
-    let direct_url = convert_gdrive_url(&url);
+    let service = detect_cloud_service(&url);
+
+    // MEGA — validate by checking if megadl is available
+    if service == "MEGA" {
+        let has_megadl = std::process::Command::new("megadl")
+            .arg("--help")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+
+        return Ok(LinkValidation {
+            valid: true,
+            final_url: url.clone(),
+            filename: guess_filename_from_url(&url),
+            content_type: "application/octet-stream".to_string(),
+            size: 0, service: service.to_string(),
+        });
+    }
+
+    // MediaFire — resolve direct link from page
+    if service == "MediaFire" {
+        if let Some(dl_url) = resolve_mediafire(&url).await {
+            return Ok(LinkValidation {
+                valid: true,
+                final_url: dl_url,
+                filename: guess_filename_from_url(&url),
+                content_type: "application/octet-stream".to_string(),
+                size: 0, service: service.to_string(),
+            });
+        } else {
+            return Ok(LinkValidation {
+                valid: false,
+                final_url: url,
+                filename: String::new(),
+                content_type: String::new(),
+                size: 0, service: service.to_string(),
+            });
+        }
+    }
+
+    let direct_url = convert_to_direct_url(&url);
 
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::limited(10))
@@ -76,7 +236,7 @@ pub async fn validate_link(url: String, _github: State<'_, GitHubClient>) -> App
                 final_url: direct_url,
                 filename: String::new(),
                 content_type: String::new(),
-                size: 0,
+                size: 0, service: service.to_string(),
             });
         }
 
@@ -94,7 +254,7 @@ pub async fn validate_link(url: String, _github: State<'_, GitHubClient>) -> App
                 final_url: direct_url,
                 filename: guess_filename_from_url(&url),
                 content_type: "application/octet-stream".to_string(),
-                size: 0,
+                size: 0, service: service.to_string(),
             });
         }
 
@@ -104,7 +264,7 @@ pub async fn validate_link(url: String, _github: State<'_, GitHubClient>) -> App
             final_url: direct_url,
             filename: fname,
             content_type,
-            size: 0,
+            size: 0, service: service.to_string(),
         });
     }
 
@@ -130,6 +290,7 @@ pub async fn validate_link(url: String, _github: State<'_, GitHubClient>) -> App
         filename,
         content_type,
         size,
+        service: service.to_string(),
     })
 }
 
@@ -228,7 +389,20 @@ pub async fn download_link(
     app: AppHandle,
     github: State<'_, GitHubClient>,
 ) -> AppResult<String> {
-    let mut download_url = convert_gdrive_url(&url);
+    let service = detect_cloud_service(&url);
+
+    // MEGA — use megadl CLI
+    if service == "MEGA" {
+        return download_mega(&url, &dest_dir).await;
+    }
+
+    // MediaFire — resolve direct link first
+    let mut download_url = if service == "MediaFire" {
+        resolve_mediafire(&url).await.unwrap_or_else(|| url.clone())
+    } else {
+        convert_to_direct_url(&url)
+    };
+
     let dest_path = std::path::Path::new(&dest_dir).join(&filename);
 
     // First attempt — check if we get HTML (Google Drive confirmation page)
