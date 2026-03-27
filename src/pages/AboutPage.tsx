@@ -120,7 +120,7 @@ const FEATURES = [
 
 const CHANGELOG = [
   {
-    version: "v0.4.7",
+    version: "v0.5.0",
     date: "2026-03-27",
     changes: [
       "Autostart support (launch on login)",
