@@ -10,6 +10,8 @@ import {
   desktopFileExists,
   addToAppMenu,
   removeFromAppMenu,
+  getAutostart,
+  setAutostart,
 } from "../lib/api";
 import { showToast } from "../lib/stores";
 
@@ -27,6 +29,10 @@ export default function SettingsPage() {
   const [isLinux, setIsLinux] = createSignal(false);
   const [desktopBusy, setDesktopBusy] = createSignal(false);
 
+  // Autostart
+  const [autostartEnabled, setAutostartEnabled] = createSignal(false);
+  const [autostartBusy, setAutostartBusy] = createSignal(false);
+
   onMount(async () => {
     // Load PAT
     try {
@@ -39,6 +45,14 @@ export default function SettingsPage() {
       // No PAT stored
     }
     refreshRateLimit();
+
+    // Autostart
+    try {
+      const enabled = await getAutostart();
+      setAutostartEnabled(enabled);
+    } catch {
+      // ignore
+    }
 
     // Desktop integration - only show on Linux
     try {
@@ -191,6 +205,35 @@ export default function SettingsPage() {
           </div>
         </div>
       </Show>
+
+      <div class="settings-section">
+        <h3>Startup</h3>
+        <p class="settings-hint">
+          Launch PyArsenal automatically when you log in.
+        </p>
+        <div class="toggle-row">
+          <span>Launch on startup</span>
+          <button
+            class={`toggle-switch ${autostartEnabled() ? "toggle-on" : ""}`}
+            disabled={autostartBusy()}
+            onClick={async () => {
+              const enabled = !autostartEnabled();
+              setAutostartBusy(true);
+              try {
+                await setAutostart(enabled);
+                setAutostartEnabled(enabled);
+                showToast("success", enabled ? "PyArsenal will start on login." : "Autostart disabled.");
+              } catch (err) {
+                showToast("error", `Failed to change autostart: ${err}`);
+              } finally {
+                setAutostartBusy(false);
+              }
+            }}
+          >
+            <span class="toggle-knob" />
+          </button>
+        </div>
+      </div>
 
       <div class="settings-section">
         <h3>GitHub Account</h3>

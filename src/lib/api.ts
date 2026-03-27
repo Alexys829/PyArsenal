@@ -91,6 +91,12 @@ export const clearPat = () =>
 export const getRateLimit = () =>
   invoke<[number, number]>("get_rate_limit");
 
+export const getAutostart = () =>
+  invoke<boolean>("get_autostart");
+
+export const setAutostart = (enabled: boolean) =>
+  invoke<void>("set_autostart", { enabled });
+
 // Desktop integration
 export const getPlatform = () =>
   invoke<string>("get_platform");

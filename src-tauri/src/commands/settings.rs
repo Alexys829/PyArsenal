@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
+use tauri_plugin_autostart::AutoLaunchManager;
 
 use crate::error::{AppError, AppResult};
 use crate::github::GitHubClient;
@@ -49,6 +50,25 @@ pub async fn clear_pat(github: State<'_, GitHubClient>) -> AppResult<()> {
 #[tauri::command]
 pub async fn get_rate_limit(github: State<'_, GitHubClient>) -> AppResult<(u32, u32)> {
     github.get_rate_limit().await
+}
+
+// ── Autostart ──
+
+#[tauri::command]
+pub async fn get_autostart(app: AppHandle) -> AppResult<bool> {
+    let manager = app.state::<AutoLaunchManager>();
+    manager.is_enabled().map_err(|e| AppError::Generic(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn set_autostart(app: AppHandle, enabled: bool) -> AppResult<()> {
+    let manager = app.state::<AutoLaunchManager>();
+    if enabled {
+        manager.enable().map_err(|e| AppError::Generic(e.to_string()))?;
+    } else {
+        manager.disable().map_err(|e| AppError::Generic(e.to_string()))?;
+    }
+    Ok(())
 }
 
 // ── Theme persistence ──

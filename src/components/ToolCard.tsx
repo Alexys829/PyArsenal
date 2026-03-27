@@ -52,6 +52,7 @@ interface ToolCardProps {
   installedTool?: InstalledTool;
   updateInfo?: UpdateInfo;
   onRefresh: () => void;
+  compact?: boolean;
 }
 
 export default function ToolCard(props: ToolCardProps) {
@@ -220,6 +221,80 @@ export default function ToolCard(props: ToolCardProps) {
   };
 
   return (
+    <Show when={!props.compact} fallback={
+      <div class="tool-row">
+        <div class="tool-row-icon">
+          {iconSrc() ? (
+            <img src={iconSrc()} alt={props.entry.name} class="tool-icon-img" />
+          ) : (
+            props.entry.name[0]
+          )}
+        </div>
+        <div class="tool-row-name">
+          {props.entry.name}
+          {props.mode === "library" && props.installedTool && (
+            <span class="tool-row-version-sub">v{props.installedTool.installed_version}</span>
+          )}
+        </div>
+        <span class={`category-badge ${categoryClass()}`}>{props.entry.category}</span>
+        <span class="tool-row-author">by {author()}</span>
+        {props.mode === "library" && props.installedTool && props.installedTool.size_bytes > 0 && (
+          <span class="tool-row-size">{formatBytes(props.installedTool.size_bytes)}</span>
+        )}
+        {update() && <span class="update-badge">Update</span>}
+        <div class="tool-row-actions">
+          <button
+            class={`btn-fav ${isFav() ? "btn-fav-active" : ""}`}
+            onClick={handleToggleFavorite}
+            title={isFav() ? "Remove from favorites" : "Add to favorites"}
+          >
+            {isFav() ? <StarIcon /> : <StarOutlineIcon />}
+          </button>
+          {props.mode === "store" && (
+            <>
+              {isInstalled() ? (
+                <button class="btn btn-launch" onClick={handleLaunch} title={`Launch ${props.entry.name}`}>
+                  <PlayIcon />
+                </button>
+              ) : busy() ? (
+                <button class="btn btn-cancel" onClick={handleCancel} title="Cancel">
+                  <CancelIcon />
+                </button>
+              ) : (
+                <button class="btn btn-install" onClick={handleInstall} title={`Install ${props.entry.name}`}>
+                  <DownloadIcon />
+                </button>
+              )}
+            </>
+          )}
+          {props.mode === "library" && (
+            <>
+              <button class="btn btn-launch" onClick={handleLaunch} title={`Launch ${props.entry.name}`}>
+                <PlayIcon />
+              </button>
+              {update() && !busy() && (
+                <button class="btn btn-update" onClick={handleUpdate} title={`Update to v${update()!.latest_version}`}>
+                  <UpdateIcon />
+                </button>
+              )}
+              {busy() && (
+                <button class="btn btn-cancel" onClick={handleCancel} title="Cancel">
+                  <CancelIcon />
+                </button>
+              )}
+              <button
+                class={`btn ${confirmUninstall() ? "btn-confirm-delete" : "btn-icon-danger"}`}
+                disabled={busy()}
+                onClick={handleUninstall}
+                title={confirmUninstall() ? "Click again to confirm" : `Uninstall ${props.entry.name}`}
+              >
+                <DeleteIcon />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    }>
     <div class="tool-card">
       <div class="tool-card-header">
         <div class="tool-icon">
@@ -386,5 +461,6 @@ export default function ToolCard(props: ToolCardProps) {
         </div>
       </Show>
     </div>
+    </Show>
   );
 }

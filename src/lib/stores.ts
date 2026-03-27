@@ -8,6 +8,27 @@ export const [loading, setLoading] = createSignal(false);
 export const [activeDownloads, setActiveDownloads] = createSignal<Record<string, DownloadProgress>>({});
 export const [favorites, setFavorites] = createSignal<string[]>([]);
 export const [launchCounts, setLaunchCounts] = createSignal<Record<string, number>>({});
+export type ViewMode = "grid" | "list";
+
+function loadViewMode(key: string): ViewMode {
+  const v = localStorage.getItem(key);
+  return v === "list" ? "list" : "grid";
+}
+
+const [_libraryViewMode, _setLibraryViewMode] = createSignal<ViewMode>(loadViewMode("libraryViewMode"));
+const [_storeViewMode, _setStoreViewMode] = createSignal<ViewMode>(loadViewMode("storeViewMode"));
+
+export const libraryViewMode = _libraryViewMode;
+export const setLibraryViewMode = (mode: ViewMode) => {
+  _setLibraryViewMode(mode);
+  localStorage.setItem("libraryViewMode", mode);
+};
+
+export const storeViewMode = _storeViewMode;
+export const setStoreViewMode = (mode: ViewMode) => {
+  _setStoreViewMode(mode);
+  localStorage.setItem("storeViewMode", mode);
+};
 
 // Toast notifications
 export interface Toast {

@@ -1,5 +1,5 @@
 import { createSignal, createMemo, For, Show } from "solid-js";
-import { catalog, installedTools, updates, favorites, formatBytes } from "../lib/stores";
+import { catalog, installedTools, updates, favorites, formatBytes, libraryViewMode, setLibraryViewMode } from "../lib/stores";
 import { installTool } from "../lib/api";
 import { showToast, setInstalledTools } from "../lib/stores";
 import ToolCard from "../components/ToolCard";
@@ -106,8 +106,26 @@ export default function LibraryPage(props: LibraryPageProps) {
       </div>
 
       <div class="library-summary">
-        {Object.keys(installedTools()).length} installed
-        {updatesAvailable() > 0 && <span class="update-badge" style={{ "margin-left": "8px" }}>{updatesAvailable()} update(s)</span>}
+        <span>
+          {Object.keys(installedTools()).length} installed
+          {updatesAvailable() > 0 && <span class="update-badge" style={{ "margin-left": "8px" }}>{updatesAvailable()} update(s)</span>}
+        </span>
+        <div class="view-toggle">
+          <button
+            class={`btn btn-icon ${libraryViewMode() === "grid" ? "btn-icon-active" : ""}`}
+            onClick={() => setLibraryViewMode("grid")}
+            title="Grid view"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zm10-10h8v8h-8V3zm0 10h8v8h-8v-8z"/></svg>
+          </button>
+          <button
+            class={`btn btn-icon ${libraryViewMode() === "list" ? "btn-icon-active" : ""}`}
+            onClick={() => setLibraryViewMode("list")}
+            title="List view"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/></svg>
+          </button>
+        </div>
       </div>
 
       <Show
@@ -119,7 +137,7 @@ export default function LibraryPage(props: LibraryPageProps) {
           </div>
         }
       >
-        <div class="tool-grid">
+        <div class={libraryViewMode() === "grid" ? "tool-grid" : "tool-list"}>
           <For each={installedEntries()}>
             {({ tool, entry, updateInfo }) => (
               <ToolCard
@@ -143,6 +161,7 @@ export default function LibraryPage(props: LibraryPageProps) {
                 installedTool={tool}
                 updateInfo={updateInfo}
                 onRefresh={props.onRefresh}
+                compact={libraryViewMode() === "list"}
               />
             )}
           </For>

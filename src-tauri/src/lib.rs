@@ -6,6 +6,7 @@ mod paths;
 
 use github::GitHubClient;
 use tauri::Manager;
+use tauri_plugin_autostart::MacosLauncher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,6 +16,7 @@ pub fn run() {
     let download_manager = commands::install::DownloadManager::new();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_notification::init())
@@ -53,6 +55,8 @@ pub fn run() {
             commands::settings::get_rate_limit,
             commands::settings::get_theme_config,
             commands::settings::save_theme_config,
+            commands::settings::get_autostart,
+            commands::settings::set_autostart,
             commands::desktop::get_platform,
             commands::desktop::get_appimage_path,
             commands::desktop::desktop_file_exists,

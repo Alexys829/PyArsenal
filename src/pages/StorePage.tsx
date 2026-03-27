@@ -1,6 +1,6 @@
 import { createSignal, createMemo, For, Show } from "solid-js";
 import { invoke } from "@tauri-apps/api/core";
-import { catalog, loading, installedTools } from "../lib/stores";
+import { catalog, loading, installedTools, storeViewMode, setStoreViewMode } from "../lib/stores";
 import ToolCard from "../components/ToolCard";
 import SearchBar from "../components/SearchBar";
 
@@ -65,7 +65,23 @@ export default function StorePage(props: StorePageProps) {
       </div>
 
       <div class="library-summary">
-        {compatible().length} tools available &middot; {Object.keys(installedTools()).length} installed
+        <span>{compatible().length} tools available &middot; {Object.keys(installedTools()).length} installed</span>
+        <div class="view-toggle">
+          <button
+            class={`btn btn-icon ${storeViewMode() === "grid" ? "btn-icon-active" : ""}`}
+            onClick={() => setStoreViewMode("grid")}
+            title="Grid view"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 3h8v8H3V3zm0 10h8v8H3v-8zm10-10h8v8h-8V3zm0 10h8v8h-8v-8z"/></svg>
+          </button>
+          <button
+            class={`btn btn-icon ${storeViewMode() === "list" ? "btn-icon-active" : ""}`}
+            onClick={() => setStoreViewMode("list")}
+            title="List view"
+          >
+            <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 4h18v2H3V4zm0 7h18v2H3v-2zm0 7h18v2H3v-2z"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="category-tabs">
@@ -93,13 +109,14 @@ export default function StorePage(props: StorePageProps) {
           when={filtered().length > 0}
           fallback={<div class="empty">No tools found.</div>}
         >
-          <div class={`tool-grid ${isIncompatibleTab() ? "tool-grid-dimmed" : ""}`}>
+          <div class={`${storeViewMode() === "grid" ? "tool-grid" : "tool-list"} ${isIncompatibleTab() ? "tool-grid-dimmed" : ""}`}>
             <For each={filtered()}>
               {(entry) => (
                 <ToolCard
                   entry={entry}
                   mode="store"
                   onRefresh={props.onRefresh}
+                  compact={storeViewMode() === "list"}
                 />
               )}
             </For>
