@@ -2,10 +2,12 @@ import { createSignal, onMount, onCleanup, Show } from "solid-js";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch, exit } from "@tauri-apps/plugin-process";
 import { listen } from "@tauri-apps/api/event";
-import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission, getFavorites, getLaunchCounts, getThemeConfig } from "./lib/api";
+import { fetchCatalog, getInstalledTools, checkAllUpdates, getCatalogEntries, checkCatalogPermission, getFavorites, getLaunchCounts, getThemeConfig, getRateLimit, getStats } from "./lib/api";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import type { DownloadProgress } from "./lib/types";
 import {
+  catalog,
+  installedTools,
   setCatalog,
   setInstalledTools,
   setUpdates,
@@ -15,6 +17,8 @@ import {
   setLoading,
   showToast,
   formatBytes,
+  selectedToolId,
+  setSelectedToolId,
 } from "./lib/stores";
 import Sidebar from "./components/Sidebar";
 import ToastContainer from "./components/Toast";
@@ -24,6 +28,7 @@ import SettingsPage from "./pages/SettingsPage";
 import AddToolPage from "./pages/AddToolPage";
 import StatsPage from "./pages/StatsPage";
 import AboutPage from "./pages/AboutPage";
+import ToolDetail from "./components/ToolDetail";
 import DownloadsPage from "./pages/DownloadsPage";
 import ThemesPage from "./pages/ThemesPage";
 import { applyTheme, getPresetById } from "./lib/themes";
@@ -37,6 +42,10 @@ function App() {
   const [selfUpdateVisible, setSelfUpdateVisible] = createSignal(false);
   const [canManageCatalog, setCanManageCatalog] = createSignal(false);
   const [globalSearch, setGlobalSearch] = createSignal("");
+  const [splashVisible, setSplashVisible] = createSignal(true);
+  const [statusRateLimit, setStatusRateLimit] = createSignal("");
+  const [statusDiskUsage, setStatusDiskUsage] = createSignal("");
+  const [statusLastUpdate, setStatusLastUpdate] = createSignal("");
 
   async function loadData(forceApi?: boolean) {
     setLoading(true);
@@ -57,9 +66,17 @@ function App() {
       setLoading(false);
     }
 
+    // Hide splash
+    setTimeout(() => setSplashVisible(false), 800);
+
     // Load favorites and launch counts
     getFavorites().then(setFavorites).catch(() => {});
     getLaunchCounts().then(setLaunchCounts).catch(() => {});
+
+    // Status bar
+    setStatusLastUpdate(new Date().toLocaleTimeString());
+    getRateLimit().then(([rem, lim]) => setStatusRateLimit(`${rem}/${lim}`)).catch(() => {});
+    getStats().then((s) => setStatusDiskUsage(formatBytes(s.total_size_bytes))).catch(() => {});
 
     // Check updates in background
     try {
@@ -181,6 +198,17 @@ function App() {
 
   return (
     <div class="app">
+      {/* Splash screen */}
+      <Show when={splashVisible()}>
+        <div class="splash-overlay">
+          <div class="splash-content">
+            <div class="splash-logo">P</div>
+            <h1 class="splash-title">PyArsenal</h1>
+            <div class="splash-spinner" />
+          </div>
+        </div>
+      </Show>
+
       <Sidebar activePage={page()} onNavigate={setPage} showManage={canManageCatalog()} />
       <main class="content">
         <Show when={page() === "store"}>
@@ -208,7 +236,30 @@ function App() {
           <SettingsPage />
         </Show>
       </main>
+
+      {/* Status bar */}
+      <div class="status-bar">
+        <span title="Disk usage by installed tools">Disk: {statusDiskUsage() || "..."}</span>
+        <span title="GitHub API rate limit remaining">API: {statusRateLimit() || "..."}</span>
+        <span title="Last catalog check">Updated: {statusLastUpdate() || "..."}</span>
+      </div>
+
       <ToastContainer />
+
+      {/* Tool detail modal */}
+      <Show when={selectedToolId()}>
+        {(id) => {
+          const entry = catalog().find((c) => c.id === id());
+          if (!entry) return null;
+          return (
+            <ToolDetail
+              entry={entry}
+              installedTool={installedTools()[id()]}
+              onClose={() => setSelectedToolId(null)}
+            />
+          );
+        }}
+      </Show>
 
       {/* Self-update modal */}
       <Show when={selfUpdateVisible()}>

@@ -7,6 +7,17 @@ export const [updates, setUpdates] = createSignal<UpdateInfo[]>([]);
 export const [loading, setLoading] = createSignal(false);
 export const [activeDownloads, setActiveDownloads] = createSignal<Record<string, DownloadProgress>>({});
 export const [favorites, setFavorites] = createSignal<string[]>([]);
+export const [selectedToolId, setSelectedToolId] = createSignal<string | null>(null);
+
+// Custom tool order for Library
+const [_toolOrder, _setToolOrder] = createSignal<string[]>(
+  JSON.parse(localStorage.getItem("libraryToolOrder") || "[]")
+);
+export const toolOrder = _toolOrder;
+export const setToolOrder = (order: string[]) => {
+  _setToolOrder(order);
+  localStorage.setItem("libraryToolOrder", JSON.stringify(order));
+};
 export const [launchCounts, setLaunchCounts] = createSignal<Record<string, number>>({});
 export type ViewMode = "grid" | "list";
 

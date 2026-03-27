@@ -28,6 +28,7 @@ import {
   showToast,
   formatBytes,
   formatDate,
+  setSelectedToolId,
 } from "../lib/stores";
 
 // SVG Icons
@@ -222,7 +223,11 @@ export default function ToolCard(props: ToolCardProps) {
 
   return (
     <Show when={!props.compact} fallback={
-      <div class="tool-row">
+      <div class="tool-row" onClick={(e) => {
+        if (!(e.target as HTMLElement).closest("button, .btn-fav, .tool-row-actions")) {
+          setSelectedToolId(props.entry.id);
+        }
+      }} style={{ cursor: "pointer" }}>
         <div class="tool-row-icon">
           {iconSrc() ? (
             <img src={iconSrc()} alt={props.entry.name} class="tool-icon-img" />
@@ -295,7 +300,12 @@ export default function ToolCard(props: ToolCardProps) {
         </div>
       </div>
     }>
-    <div class="tool-card">
+    <div class="tool-card" onClick={(e) => {
+      // Open detail only if not clicking a button/link
+      if (!(e.target as HTMLElement).closest("button, a, .btn-fav, .tool-actions")) {
+        setSelectedToolId(props.entry.id);
+      }
+    }} style={{ cursor: "pointer" }}>
       <div class="tool-card-header">
         <div class="tool-icon">
           {iconSrc() ? (
