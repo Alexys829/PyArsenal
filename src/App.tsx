@@ -23,6 +23,7 @@ import LibraryPage from "./pages/LibraryPage";
 import SettingsPage from "./pages/SettingsPage";
 import AddToolPage from "./pages/AddToolPage";
 import StatsPage from "./pages/StatsPage";
+import AboutPage from "./pages/AboutPage";
 import DownloadsPage from "./pages/DownloadsPage";
 import ThemesPage from "./pages/ThemesPage";
 import { applyTheme, getPresetById } from "./lib/themes";
@@ -199,6 +200,9 @@ function App() {
         </Show>
         <Show when={page() === "themes"}>
           <ThemesPage />
+        </Show>
+        <Show when={page() === "about"}>
+          <AboutPage />
         </Show>
         <Show when={page() === "settings"}>
           <SettingsPage />
