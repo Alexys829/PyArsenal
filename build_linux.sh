@@ -37,15 +37,9 @@ echo ""
 echo "Output files:"
 
 # List generated bundles
-if [ -f "src-tauri/target/release/bundle/appimage/"*.AppImage ]; then
-    ls -lh src-tauri/target/release/bundle/appimage/*.AppImage
-fi
-if [ -f "src-tauri/target/release/bundle/deb/"*.deb ]; then
-    ls -lh src-tauri/target/release/bundle/deb/*.deb
-fi
-if [ -f "src-tauri/target/release/bundle/rpm/"*.rpm ]; then
-    ls -lh src-tauri/target/release/bundle/rpm/*.rpm
-fi
+ls -lh src-tauri/target/release/bundle/appimage/*.AppImage 2>/dev/null
+ls -lh src-tauri/target/release/bundle/deb/*.deb 2>/dev/null
+ls -lh src-tauri/target/release/bundle/rpm/*.rpm 2>/dev/null
 
 echo ""
 echo "AppImage: src-tauri/target/release/bundle/appimage/"
