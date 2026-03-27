@@ -32,6 +32,8 @@ export default function AddToolPage(props: AddToolPageProps) {
   const [windowsBinary, setWindowsBinary] = createSignal("");
   const [linuxInstallType, setLinuxInstallType] = createSignal("binary");
   const [windowsInstallType, setWindowsInstallType] = createSignal("binary");
+  const [toolTags, setToolTags] = createSignal("");
+  const [tagInput, setTagInput] = createSignal("");
 
   onMount(() => loadCatalog());
 
@@ -59,6 +61,7 @@ export default function AddToolPage(props: AddToolPageProps) {
     setWindowsBinary(entry.binary_name.windows || "");
     setLinuxInstallType(entry.install_type?.linux || "binary");
     setWindowsInstallType(entry.install_type?.windows || "binary");
+    setToolTags((entry.tags || []).join(", "));
   }
 
   async function handleScan() {
@@ -109,6 +112,7 @@ export default function AddToolPage(props: AddToolPageProps) {
       asset_patterns: assetPatterns,
       binary_name: binaryName,
       install_type: installType,
+      tags: toolTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0),
     };
   }
 
@@ -287,6 +291,46 @@ export default function AddToolPage(props: AddToolPageProps) {
             <select value={toolCategory()} onChange={(e) => setToolCategory(e.currentTarget.value)} class="form-input">
               <For each={CATEGORIES}>{(cat) => <option value={cat}>{cat}</option>}</For>
             </select>
+
+            <label>Tags</label>
+            <div class="tags-input-wrapper">
+              <div class="tags-list">
+                <For each={toolTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0)}>
+                  {(tag) => (
+                    <span class="tag-chip">
+                      {tag}
+                      <button
+                        class="tag-remove"
+                        onClick={() => {
+                          const tags = toolTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0 && t !== tag);
+                          setToolTags(tags.join(", "));
+                        }}
+                      >&times;</button>
+                    </span>
+                  )}
+                </For>
+              </div>
+              <input
+                type="text"
+                value={tagInput()}
+                onInput={(e) => setTagInput(e.currentTarget.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === ",") {
+                    e.preventDefault();
+                    const val = tagInput().trim();
+                    if (val) {
+                      const current = toolTags().split(",").map((t) => t.trim()).filter((t) => t.length > 0);
+                      if (!current.includes(val)) {
+                        setToolTags([...current, val].join(", "));
+                      }
+                      setTagInput("");
+                    }
+                  }
+                }}
+                class="form-input"
+                placeholder="Type a tag and press Enter"
+              />
+            </div>
           </div>
         </div>
 
