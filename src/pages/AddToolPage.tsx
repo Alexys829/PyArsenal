@@ -1,7 +1,14 @@
 import { createSignal, Show, For, onMount } from "solid-js";
-import { scanRepo, addToCatalog, removeFromCatalog, updateInCatalog, getCatalogEntries, getCatalogLinks, addLinkToCatalog, updateLinkInCatalog, removeLinkFromCatalog, validateLink, uploadLinkIcon } from "../lib/api";
+import { scanRepo, addToCatalog, removeFromCatalog, updateInCatalog, getCatalogEntries, getCatalogLinks, addLinkToCatalog, updateLinkInCatalog, removeLinkFromCatalog, validateLink, uploadLinkIcon, getThirdPartyApps, addThirdPartyApp, updateThirdPartyApp, removeThirdPartyApp, validateThirdPartyUrl, uploadThirdPartyIcon } from "../lib/api";
 import { showToast } from "../lib/stores";
-import type { RepoScanResult, CatalogEntry, LinkEntry } from "../lib/types";
+import type { RepoScanResult, CatalogEntry, LinkEntry, ThirdPartyEntry, ThirdPartyUrlValidation } from "../lib/types";
+
+const EMPTY_TP = (): ThirdPartyEntry => ({
+  id: "", name: "", description: "", category: "", tags: [], icon: "",
+  url_linux: "", url_windows: "", filename_linux: "", filename_windows: "",
+  download_type_linux: "installer", download_type_windows: "installer", added_by: "",
+  commands_linux: [],
+});
 
 interface AddToolPageProps {
   onRefresh: () => void;
@@ -51,7 +58,22 @@ export default function AddToolPage(props: AddToolPageProps) {
   const [editingLink, setEditingLink] = createSignal<LinkEntry | null>(null);
   const [linkAdding, setLinkAdding] = createSignal(false);
 
-  onMount(() => { loadCatalog(); loadLinks(); });
+  // Third-party state
+  const [tpApps, setTpApps] = createSignal<ThirdPartyEntry[]>([]);
+  const [tpForm, setTpForm] = createSignal<ThirdPartyEntry>(EMPTY_TP());
+  const [tpEditId, setTpEditId] = createSignal<string | null>(null);
+  const [tpValLinux, setTpValLinux] = createSignal<ThirdPartyUrlValidation | null>(null);
+  const [tpValWin, setTpValWin] = createSignal<ThirdPartyUrlValidation | null>(null);
+  const [tpValLinuxing, setTpValLinuxing] = createSignal(false);
+  const [tpValWining, setTpValWining] = createSignal(false);
+  const [tpSaving, setTpSaving] = createSignal(false);
+  const [tpIconB64, setTpIconB64] = createSignal("");
+  const [tpIconPreview, setTpIconPreview] = createSignal("");
+  const [tpTagsInput, setTpTagsInput] = createSignal("");
+  const [tpCommandsInput, setTpCommandsInput] = createSignal("");
+  const [tpFormOpen, setTpFormOpen] = createSignal(false);
+
+  onMount(() => { loadCatalog(); loadLinks(); loadThirdParty(); });
 
   async function loadCatalog() {
     setLoadingCatalog(true);
@@ -70,6 +92,94 @@ export default function AddToolPage(props: AddToolPageProps) {
       const entries = await getCatalogLinks();
       setCatalogLinks(entries);
     } catch { /* ignore */ }
+  }
+
+  async function loadThirdParty() {
+    try { setTpApps(await getThirdPartyApps()); } catch { /* ignore */ }
+  }
+
+  async function tpValidate(platform: "linux" | "windows") {
+    const url = platform === "linux" ? tpForm().url_linux : tpForm().url_windows;
+    if (!url.trim()) return;
+    if (platform === "linux") { setTpValLinuxing(true); setTpValLinux(null); }
+    else { setTpValWining(true); setTpValWin(null); }
+    try {
+      const r = await validateThirdPartyUrl(url);
+      if (platform === "linux") {
+        setTpValLinux(r);
+        if (r.valid && r.filename) setTpForm(f => ({ ...f, filename_linux: r.filename }));
+      } else {
+        setTpValWin(r);
+        if (r.valid && r.filename) setTpForm(f => ({ ...f, filename_windows: r.filename }));
+      }
+    } catch (e) {
+      const err = { valid: false, final_url: "", filename: "", content_type: "", size: 0, service: "", error: String(e) };
+      if (platform === "linux") setTpValLinux(err); else setTpValWin(err);
+    } finally {
+      if (platform === "linux") setTpValLinuxing(false); else setTpValWining(false);
+    }
+  }
+
+  function tpOpenAdd() {
+    setTpForm(EMPTY_TP()); setTpEditId(null); setTpValLinux(null); setTpValWin(null);
+    setTpIconB64(""); setTpIconPreview(""); setTpTagsInput(""); setTpCommandsInput(""); setTpFormOpen(true);
+  }
+
+  function tpOpenEdit(app: ThirdPartyEntry) {
+    setTpForm({ ...app }); setTpEditId(app.id); setTpValLinux(null); setTpValWin(null);
+    setTpIconB64(""); setTpIconPreview(""); setTpTagsInput(app.tags.join(", "));
+    setTpCommandsInput((app.commands_linux || []).join("\n"));
+    setTpFormOpen(true);
+  }
+
+  async function tpSave() {
+    const vl = tpValLinux(), vw = tpValWin();
+    const isLinuxCmdsOnly = tpForm().download_type_linux === "commands" && tpCommandsInput().trim().length > 0;
+    
+    if (!vl?.valid && !vw?.valid && !isLinuxCmdsOnly) {
+      showToast("error", "Validate at least one URL first (or enter commands for Linux).");
+      return;
+    }
+    if (!tpForm().name.trim()) { showToast("error", "Name is required."); return; }
+    setTpSaving(true);
+    try {
+      const tags = tpTagsInput().split(",").map(t => t.trim()).filter(Boolean);
+      const cmds = tpCommandsInput().split("\n").map(c => c.trim()).filter(Boolean);
+      const id = tpEditId() || crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+      const entry: ThirdPartyEntry = { ...tpForm(), id, tags, commands_linux: cmds };
+      if (tpEditId()) await updateThirdPartyApp(entry);
+      else await addThirdPartyApp(entry);
+      if (tpIconB64()) await uploadThirdPartyIcon(id, tpIconB64()).catch(() => {});
+      showToast("success", tpEditId() ? "App updated." : "App added to catalog.");
+      setTpFormOpen(false); setTpEditId(null); setTpForm(EMPTY_TP());
+      loadThirdParty();
+    } catch (e) { showToast("error", `Failed: ${e}`); }
+    finally { setTpSaving(false); }
+  }
+
+  async function tpRemove(app: ThirdPartyEntry) {
+    if (!confirm(`Remove "${app.name}" from catalog?`)) return;
+    try { await removeThirdPartyApp(app.id); showToast("success", "Removed."); loadThirdParty(); }
+    catch (e) { showToast("error", `Failed: ${e}`); }
+  }
+
+  function tpHandleIcon(e: Event) {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = reader.result as string;
+      setTpIconPreview(r);
+      setTpIconB64(r.split(",")[1] || "");
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function TpValBadge(v: ThirdPartyUrlValidation | null, checking: boolean) {
+    if (checking) return <span class="tp-val-badge tp-val-checking">Checking…</span>;
+    if (!v) return null;
+    if (v.valid) return <span class="tp-val-badge tp-val-ok">✓ {v.service}{v.filename ? ` · ${v.filename}` : ""}</span>;
+    return <span class="tp-val-badge tp-val-err">✗ {v.error || "Invalid"}</span>;
   }
 
   async function handleValidateLink() {
@@ -697,6 +807,166 @@ export default function AddToolPage(props: AddToolPageProps) {
           </div>
         </Show>
       </div>
+
+      {/* ── Third-Party Apps Management ── */}
+      <div class="settings-section" style={{ "margin-top": "32px" }}>
+        <div style={{ display: "flex", "align-items": "center", "justify-content": "space-between", "margin-bottom": "12px" }}>
+          <h3>Third-Party Apps</h3>
+          <Show when={!tpFormOpen()}>
+            <button class="btn btn-install" onClick={tpOpenAdd}>
+              <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+              Add App
+            </button>
+          </Show>
+        </div>
+
+        {/* List */}
+        <Show when={tpApps().length > 0}>
+          <div class="catalog-list" style={{ "margin-bottom": "16px" }}>
+            <For each={tpApps()}>
+              {(app) => (
+                <div class="catalog-item">
+                  <div class="catalog-item-info">
+                    <strong>{app.name}</strong>
+                    <span class="catalog-item-meta">
+                      {app.download_type_linux !== app.download_type_windows
+                        ? `🐧 ${app.download_type_linux} · 🪟 ${app.download_type_windows}`
+                        : `${app.download_type_linux}`
+                      }
+                      {app.category ? ` · ${app.category}` : ""}
+                    </span>
+                  </div>
+                  <div class="catalog-item-actions">
+                    <button class="btn btn-small" onClick={() => tpOpenEdit(app)}>Edit</button>
+                    <button class="btn btn-small btn-danger-small" onClick={() => tpRemove(app)}>Remove</button>
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+
+      {/* Add/Edit Third-Party Form */}
+      <Show when={tpFormOpen()}>
+        <div class="settings-section">
+          <h3>{tpEditId() ? `Edit: ${tpForm().name}` : "Add Third-Party App"}</h3>
+          <div class="form-grid" style={{ "margin-bottom": "16px" }}>
+            <label>Name *</label>
+            <input class="form-input" value={tpForm().name}
+              onInput={e => setTpForm(f => ({ ...f, name: e.currentTarget.value }))}
+              placeholder="e.g. VLC Media Player" />
+
+            <label>Description</label>
+            <textarea class="form-input form-textarea" value={tpForm().description}
+              onInput={e => setTpForm(f => ({ ...f, description: e.currentTarget.value }))}
+              placeholder="Brief description…" />
+
+            <label>Category</label>
+            <input class="form-input" value={tpForm().category}
+              onInput={e => setTpForm(f => ({ ...f, category: e.currentTarget.value }))}
+              placeholder="e.g. Media, Utilities…" />
+
+            <label>Tags (comma separated)</label>
+            <input class="form-input" value={tpTagsInput()}
+              onInput={e => setTpTagsInput(e.currentTarget.value)}
+              placeholder="video, open-source" />
+
+            <label>Added by</label>
+            <input class="form-input" value={tpForm().added_by}
+              onInput={e => setTpForm(f => ({ ...f, added_by: e.currentTarget.value }))}
+              placeholder="Your name" />
+
+            <label>Icon (PNG)</label>
+            <div style={{ display: "flex", "align-items": "center", gap: "10px" }}>
+              {tpIconPreview() && <img src={tpIconPreview()} style={{ width: "40px", height: "40px", "border-radius": "8px", "object-fit": "cover" }} alt="" />}
+              <label class="btn btn-small" for="tp-icon-file">
+                {tpIconPreview() ? "Change icon" : "Upload icon…"}
+              </label>
+              <input id="tp-icon-file" type="file" accept="image/png,image/jpeg,image/webp"
+                style={{ display: "none" }} onChange={tpHandleIcon} />
+            </div>
+          </div>
+
+          {/* Linux */}
+          <div class="settings-section" style={{ "margin-bottom": "12px" }}>
+            <h3>🐧 Linux</h3>
+            <div class="form-grid">
+              <label>URL</label>
+              <div class="pat-input-row">
+                <input class="pat-input" value={tpForm().url_linux}
+                  onInput={e => { setTpForm(f => ({ ...f, url_linux: e.currentTarget.value })); setTpValLinux(null); }}
+                  placeholder="https://example.com/app.AppImage" />
+                <button class="btn btn-install" disabled={tpValLinuxing() || !tpForm().url_linux.trim()}
+                  onClick={() => tpValidate("linux")}>
+                  {tpValLinuxing() ? "Checking…" : "Validate"}
+                </button>
+              </div>
+              <label></label>
+              <div>{TpValBadge(tpValLinux(), tpValLinuxing())}</div>
+
+              <label>Filename</label>
+              <input class="form-input" value={tpForm().filename_linux}
+                onInput={e => setTpForm(f => ({ ...f, filename_linux: e.currentTarget.value }))}
+                placeholder="app.AppImage" />
+
+              <label>Download type</label>
+              <select class="form-input" value={tpForm().download_type_linux}
+                onChange={e => setTpForm(f => ({ ...f, download_type_linux: e.currentTarget.value }))}>
+                <option value="installer">Installer — launch &amp; delete file</option>
+                <option value="archive">Archive — save to chosen folder</option>
+                <option value="commands">Console Commands — no download</option>
+              </select>
+
+              <label>Bash Commands (optional, one per line)</label>
+              <textarea class="form-input form-textarea" value={tpCommandsInput()}
+                onInput={e => setTpCommandsInput(e.currentTarget.value)}
+                placeholder="sudo apt-get install myapp\nmyapp --version" />
+            </div>
+          </div>
+
+          {/* Windows */}
+          <div class="settings-section" style={{ "margin-bottom": "12px" }}>
+            <h3>🪟 Windows</h3>
+            <div class="form-grid">
+              <label>URL</label>
+              <div class="pat-input-row">
+                <input class="pat-input" value={tpForm().url_windows}
+                  onInput={e => { setTpForm(f => ({ ...f, url_windows: e.currentTarget.value })); setTpValWin(null); }}
+                  placeholder="https://example.com/setup.exe" />
+                <button class="btn btn-install" disabled={tpValWining() || !tpForm().url_windows.trim()}
+                  onClick={() => tpValidate("windows")}>
+                  {tpValWining() ? "Checking…" : "Validate"}
+                </button>
+              </div>
+              <label></label>
+              <div>{TpValBadge(tpValWin(), tpValWining())}</div>
+
+              <label>Filename</label>
+              <input class="form-input" value={tpForm().filename_windows}
+                onInput={e => setTpForm(f => ({ ...f, filename_windows: e.currentTarget.value }))}
+                placeholder="setup.exe" />
+
+              <label>Download type</label>
+              <select class="form-input" value={tpForm().download_type_windows}
+                onChange={e => setTpForm(f => ({ ...f, download_type_windows: e.currentTarget.value }))}>
+                <option value="installer">Installer — launch &amp; delete file</option>
+                <option value="archive">Archive — save to chosen folder</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="pat-actions">
+            <button class="btn btn-install btn-large"
+              disabled={tpSaving() || !tpForm().name.trim()}
+              onClick={tpSave}>
+              {tpSaving() ? "Saving…" : tpEditId() ? "Save Changes" : "Add to Catalog"}
+            </button>
+            <button class="btn btn-small" onClick={() => { setTpFormOpen(false); setTpEditId(null); }}>Cancel</button>
+          </div>
+        </div>
+      </Show>
+
     </div>
   );
 }

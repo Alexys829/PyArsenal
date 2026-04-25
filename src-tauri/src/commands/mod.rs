@@ -6,4 +6,5 @@ pub mod launch;
 pub mod library;
 pub mod links;
 pub mod settings;
+pub mod third_party;
 pub mod update;

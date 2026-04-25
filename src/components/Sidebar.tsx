@@ -46,6 +46,15 @@ export default function Sidebar(props: SidebarProps) {
           </svg>
           <span>Downloads</span>
         </li>
+        <li
+          class={props.activePage === "thirdparty" ? "active" : ""}
+          onClick={() => props.onNavigate("thirdparty")}
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" />
+          </svg>
+          <span>Third-Party</span>
+        </li>
         <Show when={props.showManage}>
           <li
             class={props.activePage === "addtool" ? "active" : ""}

@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile, ThemeConfig, LinkEntry, LinkValidation } from "./types";
+import type { CatalogEntry, InstalledTool, UpdateInfo, RepoScanResult, ReleaseInfo, AppStats, ExportProfile, ThemeConfig, LinkEntry, LinkValidation, ThirdPartyEntry, ThirdPartyUrlValidation } from "./types";
 
 export const fetchCatalog = () =>
   invoke<CatalogEntry[]>("fetch_catalog");
@@ -169,3 +169,43 @@ export const getThemeConfig = () =>
 
 export const saveThemeConfig = (config: ThemeConfig) =>
   invoke<void>("save_theme_config", { config });
+
+// Third-party apps
+export const validateThirdPartyUrl = (url: string) =>
+  invoke<ThirdPartyUrlValidation>("validate_third_party_url", { url });
+
+export const getThirdPartyApps = () =>
+  invoke<ThirdPartyEntry[]>("get_third_party_apps");
+
+export const addThirdPartyApp = (entry: ThirdPartyEntry) =>
+  invoke<void>("add_third_party_app", { entry });
+
+export const updateThirdPartyApp = (entry: ThirdPartyEntry) =>
+  invoke<void>("update_third_party_app", { entry });
+
+export const removeThirdPartyApp = (appId: string) =>
+  invoke<void>("remove_third_party_app", { appId });
+
+export const downloadThirdPartyApp = (
+  appId: string,
+  url: string,
+  filename: string,
+  downloadType: string,
+  destDir: string,
+) =>
+  invoke<string>("download_third_party_app", {
+    appId,
+    url,
+    filename,
+    downloadType,
+    destDir,
+  });
+
+export const getThirdPartyIcon = (appId: string) =>
+  invoke<string>("get_third_party_icon", { appId });
+
+export const uploadThirdPartyIcon = (appId: string, iconBase64: string) =>
+  invoke<void>("upload_third_party_icon", { appId, iconBase64 });
+
+export const executeThirdPartyCommands = (appId: string, commands: string[], sudoPassword?: string) =>
+  invoke<void>("execute_third_party_commands", { appId, commands, sudoPassword });

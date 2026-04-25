@@ -78,6 +78,15 @@ pub fn run() {
             commands::desktop::create_tool_shortcut,
             commands::desktop::remove_tool_shortcut,
             commands::desktop::tool_shortcut_exists,
+            commands::third_party::validate_third_party_url,
+            commands::third_party::get_third_party_apps,
+            commands::third_party::add_third_party_app,
+            commands::third_party::update_third_party_app,
+            commands::third_party::remove_third_party_app,
+            commands::third_party::download_third_party_app,
+            commands::third_party::get_third_party_icon,
+            commands::third_party::upload_third_party_icon,
+            commands::third_party::execute_third_party_commands,
         ])
         .setup(|app| {
             // Install app icon on Linux

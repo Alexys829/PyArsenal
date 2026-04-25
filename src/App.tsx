@@ -31,6 +31,7 @@ import AboutPage from "./pages/AboutPage";
 import ToolDetail from "./components/ToolDetail";
 import DownloadsPage from "./pages/DownloadsPage";
 import ThemesPage from "./pages/ThemesPage";
+import ThirdPartyPage from "./pages/ThirdPartyPage";
 import { applyTheme, getPresetById } from "./lib/themes";
 import "./App.css";
 
@@ -219,6 +220,9 @@ function App() {
         </Show>
         <Show when={page() === "downloads"}>
           <DownloadsPage />
+        </Show>
+        <Show when={page() === "thirdparty"}>
+          <ThirdPartyPage />
         </Show>
         <Show when={page() === "addtool"}>
           <AddToolPage onRefresh={() => loadData(true)} />

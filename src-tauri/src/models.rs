@@ -11,6 +11,8 @@ pub struct Catalog {
     pub tools: Vec<CatalogEntry>,
     #[serde(default)]
     pub links: Vec<LinkEntry>,
+    #[serde(default)]
+    pub third_party: Vec<ThirdPartyEntry>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +29,46 @@ pub struct LinkEntry {
     pub tags: Vec<String>,
     #[serde(default)]
     pub added_by: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThirdPartyEntry {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub icon: String,
+    /// Direct download URL for Linux
+    #[serde(default)]
+    pub url_linux: String,
+    /// Direct download URL for Windows
+    #[serde(default)]
+    pub url_windows: String,
+    /// Expected filename for Linux download (auto-detected via validation)
+    #[serde(default)]
+    pub filename_linux: String,
+    /// Expected filename for Windows download (auto-detected via validation)
+    #[serde(default)]
+    pub filename_windows: String,
+    /// Post-download action for Linux: "installer" (launch+delete) | "archive" (save to dir)
+    #[serde(default = "default_download_type")]
+    pub download_type_linux: String,
+    /// Post-download action for Windows: "installer" (launch+delete) | "archive" (save to dir)
+    #[serde(default = "default_download_type")]
+    pub download_type_windows: String,
+    #[serde(default)]
+    pub added_by: String,
+    /// List of bash commands to execute on Linux (run sequentially as a script)
+    #[serde(default)]
+    pub commands_linux: Vec<String>,
+}
+
+fn default_download_type() -> String {
+    "installer".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,6 +157,15 @@ pub struct DownloadProgress {
     pub downloaded: u64,
     pub total: u64,
     pub speed_bps: u64,
+}
+
+// ── Command Output event ──
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandOutput {
+    pub tool_id: String,
+    pub line: String,
+    pub is_error: bool,
 }
 
 // ── Statistics ──

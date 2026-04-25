@@ -104,3 +104,38 @@ export interface ThemeConfig {
   active: string;
   custom_themes: CustomTheme[];
 }
+
+export interface ThirdPartyEntry {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  tags: string[];
+  icon: string;
+  url_linux: string;
+  url_windows: string;
+  filename_linux: string;
+  filename_windows: string;
+  /** "installer" | "archive" */
+  download_type_linux: string;
+  /** "installer" | "archive" */
+  download_type_windows: string;
+  added_by: string;
+  commands_linux: string[];
+}
+
+export interface CommandOutput {
+  tool_id: string;
+  line: string;
+  is_error: boolean;
+}
+
+export interface ThirdPartyUrlValidation {
+  valid: boolean;
+  final_url: string;
+  filename: string;
+  content_type: string;
+  size: number;
+  service: string;
+  error: string;
+}
